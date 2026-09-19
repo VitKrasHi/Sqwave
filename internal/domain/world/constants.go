@@ -1,8 +1,14 @@
 package world
 
 const (
+	// Размер окна (= вьюпорт камеры).
 	ScreenWidth  = 960
 	ScreenHeight = 640
+
+	// Размер игрового мира.
+	WorldWidth  = 2000.0
+	WorldHeight = 1500.0
+	WallThick   = 30.0
 
 	PlayerSize   = 24.0
 	PlayerSpeed  = 3.0

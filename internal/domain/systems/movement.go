@@ -81,8 +81,8 @@ func moveX(w *world.World, dx float64) {
 	if targetX < 0 {
 		targetX = 0
 	}
-	if targetX+world.PlayerSize > world.ScreenWidth {
-		targetX = world.ScreenWidth - world.PlayerSize
+	if targetX+world.PlayerSize > world.WorldWidth {
+		targetX = world.WorldWidth - world.PlayerSize
 	}
 	p.X = targetX
 }
@@ -118,8 +118,8 @@ func moveY(w *world.World, dy float64) {
 	if targetY < 0 {
 		targetY = 0
 	}
-	if targetY+world.PlayerSize > world.ScreenHeight {
-		targetY = world.ScreenHeight - world.PlayerSize
+	if targetY+world.PlayerSize > world.WorldHeight {
+		targetY = world.WorldHeight - world.PlayerSize
 	}
 	p.Y = targetY
 }

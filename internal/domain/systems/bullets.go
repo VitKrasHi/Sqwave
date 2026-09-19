@@ -12,8 +12,8 @@ func StepBullets(w *world.World) {
 		if b.Life <= 0 {
 			continue
 		}
-		if b.X < -world.BulletSize || b.X > world.ScreenWidth+world.BulletSize ||
-			b.Y < -world.BulletSize || b.Y > world.ScreenHeight+world.BulletSize {
+		if b.X < -world.BulletSize || b.X > world.WorldWidth+world.BulletSize ||
+			b.Y < -world.BulletSize || b.Y > world.WorldHeight+world.BulletSize {
 			continue
 		}
 
