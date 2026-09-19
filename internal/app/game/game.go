@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"math"
 
 	"Sqwave/internal/domain/input"
@@ -28,16 +29,14 @@ func New(w *world.World, in InputSource) *Game {
 func (g *Game) Update() error {
 	in := g.input.Poll()
 
-	// Курсор приходит в экранных координатах. Переводим в мировые,
-	// потому что вся игровая логика работает в мировых.
-	// Камера — это представление, поэтому перевод делается здесь,
-	// а не в domain.
+	// Экранные координаты курсора → мировые.
 	in.AimX += g.camera.X
 	in.AimY += g.camera.Y
 
 	g.lastInput = in
 
 	systems.StepPlayer(g.world, in)
+	systems.StepWeaponSelection(g.world, in)
 	systems.StepShooting(g.world, in)
 	systems.StepBullets(g.world)
 
@@ -56,19 +55,21 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawRect(wall.X, wall.Y, wall.W, wall.H, ColorWall)
 	}
 
+	// Шлейфы сначала — чтобы квадраты пуль рисовались поверх.
 	for _, b := range w.Bullets {
 		l := math.Hypot(b.VX, b.VY)
 		if l == 0 {
 			continue
 		}
-		headX := b.X + world.BulletSize/2
-		headY := b.Y + world.BulletSize/2
-		tailX := headX - b.VX/l*world.BulletTrailLen
-		tailY := headY - b.VY/l*world.BulletTrailLen
-		r.DrawLine(headX, headY, tailX, tailY, 2, ColorTrail)
+		weapon := b.Weapon.Stats()
+		headX := b.X + b.Size/2
+		headY := b.Y + b.Size/2
+		tailX := headX - b.VX/l*weapon.TrailLen
+		tailY := headY - b.VY/l*weapon.TrailLen
+		r.DrawLine(headX, headY, tailX, tailY, 2, bulletTrailColor(b.Weapon))
 	}
 	for _, b := range w.Bullets {
-		r.DrawRect(b.X, b.Y, world.BulletSize, world.BulletSize, ColorBullet)
+		r.DrawRect(b.X, b.Y, b.Size, b.Size, bulletColor(b.Weapon))
 	}
 
 	p := &w.Player
@@ -78,7 +79,6 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 	r.DrawRect(p.X, p.Y, world.PlayerSize, world.PlayerSize, playerColor)
 
-	// Прицел — теперь без ручного сложения с камерой:
 	pcx, pcy := p.Center()
 	dx := g.lastInput.AimX - pcx
 	dy := g.lastInput.AimY - pcy
@@ -88,5 +88,6 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 	r.DrawLine(pcx, pcy, pcx+dx*aimLineLength, pcy+dy*aimLineLength, 2, ColorAim)
 
-	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire", 8, 8)
+	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2: weapon", 8, 8)
+	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
 }

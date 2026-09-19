@@ -3,10 +3,9 @@ package world
 import "Sqwave/internal/domain/geometry"
 
 type World struct {
-	Player            Player
-	Bullets           []Bullet
-	Walls             []geometry.Rect
-	FireCooldownTimer int
+	Player  Player
+	Bullets []Bullet
+	Walls   []geometry.Rect
 }
 
 func New() *World {

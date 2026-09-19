@@ -6,6 +6,8 @@ type Player struct {
 	X, Y              float64
 	DashTimer         int
 	DashCooldownTimer int
+	Weapon            WeaponType
+	FireCooldownTimer int
 }
 
 func (p *Player) Rect() geometry.Rect {

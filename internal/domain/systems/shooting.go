@@ -8,14 +8,17 @@ import (
 )
 
 func StepShooting(w *world.World, in input.PlayerInput) {
-	if w.FireCooldownTimer > 0 {
-		w.FireCooldownTimer--
+	p := &w.Player
+	if p.FireCooldownTimer > 0 {
+		p.FireCooldownTimer--
 	}
-	if !in.Fire || w.FireCooldownTimer > 0 {
+	if !in.Fire || p.FireCooldownTimer > 0 {
 		return
 	}
 
-	cx, cy := w.Player.Center()
+	weapon := p.Weapon.Stats()
+
+	cx, cy := p.Center()
 	dx := in.AimX - cx
 	dy := in.AimY - cy
 	l := math.Hypot(dx, dy)
@@ -26,11 +29,13 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	dy /= l
 
 	w.Bullets = append(w.Bullets, world.Bullet{
-		X:    cx - world.BulletSize/2,
-		Y:    cy - world.BulletSize/2,
-		VX:   dx * world.BulletSpeed,
-		VY:   dy * world.BulletSpeed,
-		Life: world.BulletLifetime,
+		X:      cx - weapon.BulletSize/2,
+		Y:      cy - weapon.BulletSize/2,
+		VX:     dx * weapon.BulletSpeed,
+		VY:     dy * weapon.BulletSpeed,
+		Life:   weapon.BulletLifetime,
+		Size:   weapon.BulletSize,
+		Weapon: p.Weapon,
 	})
-	w.FireCooldownTimer = world.FireCooldown
+	p.FireCooldownTimer = weapon.FireCooldown
 }
