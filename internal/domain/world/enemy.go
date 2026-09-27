@@ -51,18 +51,27 @@ type Enemy struct {
 	FacingX, FacingY float64
 
 	AttackTimer int
-
 	SwingActive bool
 	SwingTimer  int
 
-	// Knockback — импульс от удара щитом.
 	KnockbackVX    float64
 	KnockbackVY    float64
 	KnockbackTimer int
 
-	// LastSwingHitID — номер замаха игрока, который уже попал.
-	// Защищает от повторного урона в одном провороте.
 	LastSwingHitID int
+
+	// Путь — срез waypoint'ов (мировых координат) для обхода стен.
+	// Пока игрок виден напрямую, Path = nil, враг идёт по прямой.
+	Path         []geometry.Point
+	PathIndex    int
+	PathCooldown int
+	PathGoalCell [2]int
+
+	// Детекция застревания.
+	LastX, LastY float64
+	StuckTicks   int
+
+	ForcePathTimer int // если > 0 — игнорировать direct и идти только по A*
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {

@@ -16,6 +16,7 @@ type World struct {
 	Walls      []geometry.Rect
 	SpawnZone  geometry.Rect
 	Rng        *rand.Rand
+	NavGrid    *geometry.Grid
 }
 
 func New() *World {
@@ -25,7 +26,7 @@ func New() *World {
 // NewWithSeed — для детерминированных тестов и реплеев.
 func NewWithSeed(seed int64) *World {
 	spawnSize := SpawnZoneSize
-	return &World{
+	w := &World{
 		Player: Player{
 			X:         WorldWidth/2 - PlayerSize/2,
 			Y:         WorldHeight/2 - PlayerSize/2,
@@ -42,6 +43,8 @@ func NewWithSeed(seed int64) *World {
 		},
 		Rng: rand.New(rand.NewSource(seed)),
 	}
+	w.NavGrid = buildNavGrid(w.Walls)
+	return w
 }
 
 // PlayerInSpawnZone — центр игрока внутри прямоугольника зоны.
@@ -87,4 +90,13 @@ func defaultEnemies() []Enemy {
 		enemies = append(enemies, NewEnemy(EnemyInfantry, p.x, p.y))
 	}
 	return enemies
+}
+
+func buildNavGrid(walls []geometry.Rect) *geometry.Grid {
+	g := geometry.NewGrid(WorldWidth, WorldHeight, NavCellSize)
+	agentSize := EnemyInfantry.Stats().Size + AgentClearance
+	for _, wall := range walls {
+		g.MarkRectForAgent(wall, agentSize)
+	}
+	return g
 }

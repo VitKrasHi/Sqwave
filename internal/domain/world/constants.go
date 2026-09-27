@@ -23,4 +23,8 @@ const (
 
 	EnemyBaseSpeed  = 1.5
 	EnemySpeedPerSP = 0.02
+
+	NavCellSize     = 24.0
+	AgentClearance  = 4.0 // запас вокруг тела при сглаживании пути
+	AgentPredictPad = 2.0 // запас при решении «идти напрямую»
 )
