@@ -55,21 +55,15 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawRect(wall.X, wall.Y, wall.W, wall.H, ColorWall)
 	}
 
-	// Шлейфы сначала — чтобы квадраты пуль рисовались поверх.
 	for _, b := range w.Bullets {
-		l := math.Hypot(b.VX, b.VY)
-		if l == 0 {
-			continue
-		}
-		weapon := b.Weapon.Stats()
-		headX := b.X + b.Size/2
-		headY := b.Y + b.Size/2
-		tailX := headX - b.VX/l*weapon.TrailLen
-		tailY := headY - b.VY/l*weapon.TrailLen
-		r.DrawLine(headX, headY, tailX, tailY, 2, bulletTrailColor(b.Weapon))
-	}
-	for _, b := range w.Bullets {
-		r.DrawRect(b.X, b.Y, b.Size, b.Size, bulletColor(b.Weapon))
+		alpha := uint8(int(255) * b.Life / b.MaxLife)
+		trail := bulletTrailColor(b.Weapon)
+		trail.A = alpha
+		r.DrawLine(b.StartX, b.StartY, b.EndX, b.EndY, 2, trail)
+
+		tip := bulletColor(b.Weapon)
+		tip.A = alpha
+		r.DrawRect(b.EndX-2, b.EndY-2, 4, 4, tip)
 	}
 
 	p := &w.Player
@@ -88,6 +82,6 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 	r.DrawLine(pcx, pcy, pcx+dx*aimLineLength, pcy+dy*aimLineLength, 2, ColorAim)
 
-	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2: weapon", 8, 8)
+	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2/3: weapon", 8, 8)
 	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
 }

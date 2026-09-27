@@ -9,8 +9,8 @@ const (
 	WallThick   = 30.0
 
 	PlayerSize   = 24.0
-	PlayerSpeed  = 3.0
-	DashSpeed    = 12.0
+	PlayerSpeed  = 5.0
+	DashSpeed    = 20.0
 	DashDuration = 8
-	DashCooldown = 45
+	DashCooldown = 40
 )

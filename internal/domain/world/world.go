@@ -1,20 +1,32 @@
 package world
 
-import "Sqwave/internal/domain/geometry"
+import (
+	"math/rand"
+	"time"
+
+	"Sqwave/internal/domain/geometry"
+)
 
 type World struct {
 	Player  Player
 	Bullets []Bullet
 	Walls   []geometry.Rect
+	Rng     *rand.Rand
 }
 
 func New() *World {
+	return NewWithSeed(time.Now().UnixNano())
+}
+
+// NewWithSeed — для детерминированных тестов и реплеев.
+func NewWithSeed(seed int64) *World {
 	return &World{
 		Player: Player{
 			X: WorldWidth/2 - PlayerSize/2,
 			Y: WorldHeight/2 - PlayerSize/2,
 		},
 		Walls: defaultWalls(),
+		Rng:   rand.New(rand.NewSource(seed)),
 	}
 }
 
