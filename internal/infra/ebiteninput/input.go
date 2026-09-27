@@ -9,9 +9,7 @@ import (
 
 type Source struct{}
 
-func New() *Source {
-	return &Source{}
-}
+func New() *Source { return &Source{} }
 
 func (s *Source) Poll() input.PlayerInput {
 	mx, my := ebiten.CursorPosition()
@@ -24,6 +22,7 @@ func (s *Source) Poll() input.PlayerInput {
 		Fire:          ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),
 		SelectWeapon1: inpututil.IsKeyJustPressed(ebiten.Key1),
 		SelectWeapon2: inpututil.IsKeyJustPressed(ebiten.Key2),
+		SelectWeapon3: inpututil.IsKeyJustPressed(ebiten.Key3),
 		AimX:          float64(mx),
 		AimY:          float64(my),
 	}

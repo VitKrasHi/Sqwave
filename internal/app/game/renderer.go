@@ -13,33 +13,51 @@ var (
 	ColorPlayerDash = color.NRGBA{R: 180, G: 220, B: 255, A: 255}
 	ColorAim        = color.NRGBA{R: 0, G: 255, B: 0, A: 255}
 
-	// Пистолет — жёлтый.
 	ColorPistolBullet = color.NRGBA{R: 255, G: 220, B: 60, A: 255}
 	ColorPistolTrail  = color.NRGBA{R: 255, G: 200, B: 40, A: 120}
 
-	// SMG — голубой.
 	ColorSMGBullet = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
 	ColorSMGTrail  = color.NRGBA{R: 80, G: 200, B: 255, A: 120}
+
+	ColorShotgunBullet = color.NRGBA{R: 255, G: 140, B: 40, A: 255}
+	ColorShotgunTrail  = color.NRGBA{R: 255, G: 100, B: 20, A: 100}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
-	if w == world.WeaponSMG {
+	switch w {
+	case world.WeaponSMG:
 		return ColorSMGBullet
+	case world.WeaponShotgun:
+		return ColorShotgunBullet
+	default:
+		return ColorPistolBullet
 	}
-	return ColorPistolBullet
 }
 
 func bulletTrailColor(w world.WeaponType) color.NRGBA {
-	if w == world.WeaponSMG {
+	switch w {
+	case world.WeaponSMG:
 		return ColorSMGTrail
+	case world.WeaponShotgun:
+		return ColorShotgunTrail
+	default:
+		return ColorPistolTrail
 	}
-	return ColorPistolTrail
 }
 
+// SceneRenderer — абстракция над движком рисования.
+// App не знает, что под ней Ebiten.
 type SceneRenderer interface {
 	Clear(c color.NRGBA)
+
+	// SetCamera задаёт смещение вьюпорта в мировых координатах.
+	// Влияет только на DrawRect и DrawLine.
 	SetCamera(x, y float64)
+
+	// DrawRect и DrawLine принимают мировые координаты.
 	DrawRect(x, y, w, h float64, c color.NRGBA)
 	DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
+
+	// DrawText принимает экранные координаты (HUD).
 	DrawText(text string, x, y float64)
 }

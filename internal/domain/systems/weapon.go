@@ -12,4 +12,7 @@ func StepWeaponSelection(w *world.World, in input.PlayerInput) {
 	if in.SelectWeapon2 {
 		w.Player.Weapon = world.WeaponSMG
 	}
+	if in.SelectWeapon3 {
+		w.Player.Weapon = world.WeaponShotgun
+	}
 }
