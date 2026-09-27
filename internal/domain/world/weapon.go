@@ -6,6 +6,7 @@ const (
 	WeaponPistol WeaponType = iota
 	WeaponSMG
 	WeaponShotgun
+	WeaponSniper
 )
 
 type WeaponStats struct {
@@ -15,6 +16,7 @@ type WeaponStats struct {
 	Spread       float64
 	Pellets      int
 	VisualLife   int
+	ChargeTime   int // для снайперки: тиков до полного заряда
 }
 
 var weapons = map[WeaponType]WeaponStats{
@@ -41,6 +43,15 @@ var weapons = map[WeaponType]WeaponStats{
 		Spread:       25,
 		Pellets:      8,
 		VisualLife:   5,
+	},
+	WeaponSniper: {
+		Name:         "Sniper",
+		FireCooldown: 60,
+		Range:        3000,
+		Spread:       0,
+		Pellets:      1,
+		VisualLife:   12,
+		ChargeTime:   45, // 0.75 сек до полного
 	},
 }
 

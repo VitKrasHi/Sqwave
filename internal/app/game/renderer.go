@@ -21,6 +21,9 @@ var (
 
 	ColorShotgunBullet = color.NRGBA{R: 255, G: 140, B: 40, A: 255}
 	ColorShotgunTrail  = color.NRGBA{R: 255, G: 100, B: 20, A: 100}
+
+	ColorSniperBullet = color.NRGBA{R: 220, G: 220, B: 255, A: 255}
+	ColorSniperTrail  = color.NRGBA{R: 180, G: 180, B: 255, A: 200}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
@@ -29,6 +32,8 @@ func bulletColor(w world.WeaponType) color.NRGBA {
 		return ColorSMGBullet
 	case world.WeaponShotgun:
 		return ColorShotgunBullet
+	case world.WeaponSniper:
+		return ColorSniperBullet
 	default:
 		return ColorPistolBullet
 	}
@@ -40,24 +45,26 @@ func bulletTrailColor(w world.WeaponType) color.NRGBA {
 		return ColorSMGTrail
 	case world.WeaponShotgun:
 		return ColorShotgunTrail
+	case world.WeaponSniper:
+		return ColorSniperTrail
 	default:
 		return ColorPistolTrail
 	}
 }
 
-// SceneRenderer — абстракция над движком рисования.
-// App не знает, что под ней Ebiten.
 type SceneRenderer interface {
 	Clear(c color.NRGBA)
 
-	// SetCamera задаёт смещение вьюпорта в мировых координатах.
+	// SetCamera задаёт мировую точку в центре экрана и масштаб.
 	// Влияет только на DrawRect и DrawLine.
-	SetCamera(x, y float64)
+	SetCamera(x, y, zoom float64)
 
 	// DrawRect и DrawLine принимают мировые координаты.
 	DrawRect(x, y, w, h float64, c color.NRGBA)
 	DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 
-	// DrawText принимает экранные координаты (HUD).
+	// Screen-space — для оверлеев и HUD (не зависят от камеры и зума).
+	DrawScreenRect(x, y, w, h float64, c color.NRGBA)
+	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawText(text string, x, y float64)
 }

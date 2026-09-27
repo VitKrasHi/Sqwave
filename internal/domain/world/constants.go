@@ -8,9 +8,10 @@ const (
 	WorldHeight = 1500.0
 	WallThick   = 30.0
 
-	PlayerSize   = 24.0
-	PlayerSpeed  = 5.0
-	DashSpeed    = 20.0
-	DashDuration = 8
-	DashCooldown = 40
+	PlayerSize     = 24.0
+	PlayerSpeed    = 4.5
+	PlayerAimSpeed = 2.0
+	DashSpeed      = 16.0
+	DashDuration   = 8
+	DashCooldown   = 40
 )

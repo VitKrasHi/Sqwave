@@ -6,6 +6,8 @@ import (
 )
 
 func StepWeaponSelection(w *world.World, in input.PlayerInput) {
+	old := w.Player.Weapon
+
 	if in.SelectWeapon1 {
 		w.Player.Weapon = world.WeaponPistol
 	}
@@ -14,5 +16,12 @@ func StepWeaponSelection(w *world.World, in input.PlayerInput) {
 	}
 	if in.SelectWeapon3 {
 		w.Player.Weapon = world.WeaponShotgun
+	}
+	if in.SelectWeapon4 {
+		w.Player.Weapon = world.WeaponSniper
+	}
+
+	if w.Player.Weapon != old {
+		w.Player.AimCharge = 0
 	}
 }

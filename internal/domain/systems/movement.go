@@ -44,6 +44,8 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	speed := world.PlayerSpeed
 	if p.Dashing() {
 		speed = world.DashSpeed
+	} else if p.IsAiming() {
+		speed = world.PlayerAimSpeed
 	}
 
 	moveX(w, dx*speed)
