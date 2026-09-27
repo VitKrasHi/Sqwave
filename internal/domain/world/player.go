@@ -16,12 +16,16 @@ type Player struct {
 	X, Y              float64
 	DashTimer         int
 	DashCooldownTimer int
-	Weapon            WeaponType // активный слот
-	Secondary         WeaponType // второй слот
+	Weapon            WeaponType
+	Secondary         WeaponType
 	FireCooldownTimer int
 	AimCharge         int
 	Swing             SwingState
-	HP                int
+
+	// Damage — накопленный урон. Текущее HP = MaxHP() - Damage.
+	// Такая модель позволяет менять состав оружия без потери
+	// «прогресса» урона: взял больше HP — тот же урон, больше запас.
+	Damage int
 }
 
 func (p *Player) Rect() geometry.Rect {
@@ -79,31 +83,30 @@ func (p *Player) TakeDamage(n int) {
 	if n <= 0 {
 		return
 	}
-	p.HP -= n
-	if p.HP < 0 {
-		p.HP = 0
-	}
+	p.Damage += n
 }
 
+// Heal уменьшает «долг» урона, но не опускает его ниже нуля.
 func (p *Player) Heal(n int) {
 	if n <= 0 {
 		return
 	}
-	p.HP += n
-	if p.HP > PlayerMaxHP {
-		p.HP = PlayerMaxHP
+	p.Damage -= n
+	if p.Damage < 0 {
+		p.Damage = 0
 	}
 }
 
 func (p *Player) IsDead() bool {
-	return p.HP <= 0
+	return p.CurrentHP() <= 0
 }
 
 func (p *Player) HPRatio() float64 {
-	if PlayerMaxHP <= 0 {
+	m := p.MaxHP()
+	if m <= 0 {
 		return 0
 	}
-	r := float64(p.HP) / float64(PlayerMaxHP)
+	r := float64(p.CurrentHP()) / float64(m)
 	if r < 0 {
 		return 0
 	}
@@ -147,4 +150,38 @@ func (p *Player) resetWeaponState() {
 	if !p.Weapon.IsShield() {
 		p.DashTimer = 0
 	}
+}
+
+// MaxHP — сумма HP-бонусов обоих слотов.
+func (p *Player) MaxHP() int {
+	return p.Weapon.Stats().HPBonus + p.Secondary.Stats().HPBonus
+}
+
+// CurrentHP — сколько HP осталось.
+func (p *Player) CurrentHP() int {
+	hp := p.MaxHP() - p.Damage
+	if hp < 0 {
+		return 0
+	}
+	return hp
+}
+
+// TotalSP — сумма SP обоих слотов.
+func (p *Player) TotalSP() int {
+	return p.Weapon.Stats().SpeedBonus + p.Secondary.Stats().SpeedBonus
+}
+
+// MoveSpeed — текущая максимальная скорость в px/tick.
+func (p *Player) MoveSpeed() float64 {
+	return PlayerBaseSpeed + float64(p.TotalSP())*SpeedPerSP
+}
+
+// AimSpeed — скорость при прицеливании.
+func (p *Player) AimSpeed() float64 {
+	return p.MoveSpeed() * AimSpeedMultiplier
+}
+
+// DashSpeed — скорость во время рывка.
+func (p *Player) DashSpeed() float64 {
+	return p.MoveSpeed() * DashSpeedMultiplier
 }

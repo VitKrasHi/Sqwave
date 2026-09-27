@@ -3,6 +3,7 @@ package game
 import (
 	"Sqwave/internal/domain/input"
 	"Sqwave/internal/domain/world"
+	"fmt"
 )
 
 type Menu struct {
@@ -97,27 +98,48 @@ func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
 	const (
 		rowH      = 30.0
 		topPad    = 16.0
+		headerH   = 36.0
 		slotH     = 30.0
 		headerGap = 20.0
-		bottomPad = 20.0
-		panelW    = 460.0
+		listGap   = 24.0
+		bottomPad = 30.0
+		panelW    = 620.0
+
+		// Колонки от правого края панели.
+		spColFromRight = 80.0
+		hpColFromRight = 170.0
 	)
 
-	panelH := topPad + slotH*2 + headerGap + float64(len(menuWeapons))*rowH + bottomPad
+	contentH := topPad +
+		headerH +
+		slotH*3 +
+		headerGap +
+		listGap +
+		float64(len(menuWeapons))*rowH
+	panelH := contentH + bottomPad
+
 	px := (sw - panelW) / 2
 	py := (sh - panelH) / 2
 
 	r.DrawScreenRect(px-2, py-2, panelW+4, panelH+4, ColorMenuBorder)
 	r.DrawScreenRect(px, py, panelW, panelH, ColorMenuPanel)
 
-	r.DrawScreenText("Loadout  (↑/↓ select, Enter confirm, E close)", px+20, py+topPad, ColorMenuText)
+	r.DrawScreenText("Loadout  (↑/↓ select, Enter confirm, E close)",
+		px+20, py+topPad, ColorMenuText)
 
-	slotY := py + topPad + 36
+	slotY := py + topPad + headerH
 	r.DrawScreenText("Active:  "+weaponLabel(p.Weapon), px+20, slotY, ColorMenuSelected)
 	r.DrawScreenText("Backup:  "+weaponLabel(p.Secondary), px+20, slotY+slotH, ColorMenuText)
 
+	// Итоги: HP слева, SP справа — тоже привязаны к колонкам, чтобы не слипались.
+	r.DrawScreenText(fmt.Sprintf("Total HP: %d", p.MaxHP()),
+		px+20, slotY+slotH*2, ColorMenuSelected)
+	r.DrawScreenText(fmt.Sprintf("Total SP: %d  (speed %.1f)", p.TotalSP(), p.MoveSpeed()),
+		px+20+240, slotY+slotH*2, ColorMenuSelected)
+
+	listY := slotY + slotH*3 + headerGap + listGap
 	for i, wt := range menuWeapons {
-		y := slotY + 72 + float64(i)*24
+		y := listY + float64(i)*rowH
 
 		marker := "  "
 		c := ColorMenuText
@@ -139,6 +161,12 @@ func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
 			label += "  (taken)"
 		}
 		r.DrawScreenText(label, px+40, y, c)
+
+		hpText := fmt.Sprintf("+%d HP", wt.Stats().HPBonus)
+		r.DrawScreenText(hpText, px+panelW-hpColFromRight, y, c)
+
+		spText := fmt.Sprintf("%d SP", wt.Stats().SpeedBonus)
+		r.DrawScreenText(spText, px+panelW-spColFromRight, y, c)
 	}
 }
 

@@ -8,13 +8,16 @@ const (
 	WorldHeight = 1500.0
 	WallThick   = 30.0
 
-	PlayerSize     = 24.0
-	PlayerSpeed    = 4.5
-	PlayerAimSpeed = 2.0
-	DashSpeed      = 16.0
-	DashDuration   = 8
-	DashCooldown   = 40
-
-	PlayerMaxHP   = 100
+	PlayerSize    = 24.0
 	SpawnZoneSize = 320.0
+
+	// Формула скорости: base + SP * coef.
+	PlayerBaseSpeed = 2.0
+	SpeedPerSP      = 0.05
+
+	AimSpeedMultiplier  = 0.45
+	DashSpeedMultiplier = 3.5
+
+	DashDuration = 8
+	DashCooldown = 40
 )

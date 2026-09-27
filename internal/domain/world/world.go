@@ -28,7 +28,6 @@ func NewWithSeed(seed int64) *World {
 		Player: Player{
 			X:         WorldWidth/2 - PlayerSize/2,
 			Y:         WorldHeight/2 - PlayerSize/2,
-			HP:        PlayerMaxHP,
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
 		},

@@ -42,11 +42,11 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		p.DashCooldownTimer = world.DashCooldown
 	}
 
-	speed := world.PlayerSpeed
+	speed := p.MoveSpeed()
 	if p.Dashing() {
-		speed = world.DashSpeed
+		speed = p.DashSpeed()
 	} else if p.IsAiming() {
-		speed = world.PlayerAimSpeed
+		speed = p.AimSpeed()
 	}
 
 	blocked := moveX(w, dx*speed)

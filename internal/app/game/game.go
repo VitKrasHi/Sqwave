@@ -162,7 +162,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawScreenText("[E] choose weapon", 8, 60, ColorSpawnZone)
 	}
 
-	drawHPBar(r, p.HP, world.PlayerMaxHP)
+	drawHPBar(r, p.CurrentHP(), p.MaxHP())
 
 	if g.menu.Open {
 		drawMenu(r, &g.menu, p)
