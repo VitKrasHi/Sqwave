@@ -13,6 +13,7 @@ type World struct {
 	Rockets    []Rocket
 	Explosions []Explosion
 	Walls      []geometry.Rect
+	SpawnZone  geometry.Rect
 	Rng        *rand.Rand
 }
 
@@ -22,14 +23,29 @@ func New() *World {
 
 // NewWithSeed — для детерминированных тестов и реплеев.
 func NewWithSeed(seed int64) *World {
+	spawnSize := SpawnZoneSize
 	return &World{
 		Player: Player{
-			X: WorldWidth/2 - PlayerSize/2,
-			Y: WorldHeight/2 - PlayerSize/2,
+			X:  WorldWidth/2 - PlayerSize/2,
+			Y:  WorldHeight/2 - PlayerSize/2,
+			HP: PlayerMaxHP,
 		},
 		Walls: defaultWalls(),
-		Rng:   rand.New(rand.NewSource(seed)),
+		SpawnZone: geometry.Rect{
+			X: WorldWidth/2 - spawnSize/2,
+			Y: WorldHeight/2 - spawnSize/2,
+			W: spawnSize,
+			H: spawnSize,
+		},
+		Rng: rand.New(rand.NewSource(seed)),
 	}
+}
+
+// PlayerInSpawnZone — центр игрока внутри прямоугольника зоны.
+func (w *World) PlayerInSpawnZone() bool {
+	cx, cy := w.Player.Center()
+	return cx >= w.SpawnZone.X && cx <= w.SpawnZone.X+w.SpawnZone.W &&
+		cy >= w.SpawnZone.Y && cy <= w.SpawnZone.Y+w.SpawnZone.H
 }
 
 func defaultWalls() []geometry.Rect {

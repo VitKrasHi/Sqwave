@@ -34,6 +34,21 @@ var (
 
 	ColorShield      = color.NRGBA{R: 170, G: 190, B: 220, A: 255}
 	ColorShieldTrail = color.NRGBA{R: 110, G: 130, B: 165, A: 170}
+
+	// HUD
+	ColorHPFull = color.NRGBA{R: 60, G: 200, B: 80, A: 255}
+	ColorHPMid  = color.NRGBA{R: 230, G: 180, B: 60, A: 255}
+	ColorHPLow  = color.NRGBA{R: 220, G: 60, B: 60, A: 255}
+	ColorHPBack = color.NRGBA{R: 25, G: 25, B: 30, A: 230}
+
+	ColorSpawnZone = color.NRGBA{R: 90, G: 220, B: 150, A: 255}
+
+	// Меню
+	ColorMenuOverlay  = color.NRGBA{A: 180}
+	ColorMenuPanel    = color.NRGBA{R: 30, G: 32, B: 42, A: 245}
+	ColorMenuBorder   = color.NRGBA{R: 90, G: 140, B: 200, A: 255}
+	ColorMenuText     = color.NRGBA{R: 220, G: 220, B: 220, A: 255}
+	ColorMenuSelected = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
@@ -88,5 +103,7 @@ type SceneRenderer interface {
 
 	DrawScreenRect(x, y, w, h float64, c color.NRGBA)
 	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
-	DrawText(text string, x, y float64)
+	DrawScreenText(text string, x, y float64, c color.NRGBA)
+
+	DrawText(text string, x, y float64) // оставляем для отладочного HUD
 }

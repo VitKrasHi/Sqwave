@@ -5,6 +5,7 @@ type PlayerInput struct {
 	Dash                  bool
 	Fire                  bool
 	FireReleased          bool
+	Interact              bool
 	SelectWeapon1         bool
 	SelectWeapon2         bool
 	SelectWeapon3         bool

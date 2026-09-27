@@ -14,4 +14,7 @@ const (
 	DashSpeed      = 16.0
 	DashDuration   = 8
 	DashCooldown   = 40
+
+	PlayerMaxHP   = 100
+	SpawnZoneSize = 320.0
 )

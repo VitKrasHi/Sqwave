@@ -20,6 +20,7 @@ type Player struct {
 	FireCooldownTimer int
 	AimCharge         int
 	Swing             SwingState
+	HP                int
 }
 
 func (p *Player) Rect() geometry.Rect {
@@ -71,4 +72,42 @@ func (p *Player) SwingProgress() float64 {
 		return 0
 	}
 	return float64(p.Swing.Timer) / float64(p.Swing.Duration)
+}
+
+func (p *Player) TakeDamage(n int) {
+	if n <= 0 {
+		return
+	}
+	p.HP -= n
+	if p.HP < 0 {
+		p.HP = 0
+	}
+}
+
+func (p *Player) Heal(n int) {
+	if n <= 0 {
+		return
+	}
+	p.HP += n
+	if p.HP > PlayerMaxHP {
+		p.HP = PlayerMaxHP
+	}
+}
+
+func (p *Player) IsDead() bool {
+	return p.HP <= 0
+}
+
+func (p *Player) HPRatio() float64 {
+	if PlayerMaxHP <= 0 {
+		return 0
+	}
+	r := float64(p.HP) / float64(PlayerMaxHP)
+	if r < 0 {
+		return 0
+	}
+	if r > 1 {
+		return 1
+	}
+	return r
 }

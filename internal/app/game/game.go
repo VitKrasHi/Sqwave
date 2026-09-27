@@ -17,8 +17,10 @@ type Game struct {
 	world  *world.World
 	input  InputSource
 	camera *Camera
+	menu   Menu
 
 	lastInput input.PlayerInput
+	ticks     int // для анимаций представления
 }
 
 func New(w *world.World, in InputSource) *Game {
@@ -33,15 +35,39 @@ func New(w *world.World, in InputSource) *Game {
 }
 
 func (g *Game) Update() error {
+	g.ticks++
+
 	in := g.input.Poll()
 
-	// Экранные координаты курсора → мировые с учётом зума и смещения камеры.
-	// Используем состояние камеры с прошлого кадра — задержка в 1 тик
-	// незаметна, зато избегаем курицы-яйца.
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y
 
 	g.lastInput = in
+
+	// Открыть/закрыть меню.
+	if in.Interact {
+		if g.menu.Open {
+			g.menu.Open = false
+		} else if g.world.PlayerInSpawnZone() {
+			g.menu.Open = true
+		}
+	}
+
+	if g.menu.Open {
+		// Игрок «заморожен»: не двигается, не стреляет, ничего не летит.
+		// Работает только выбор оружия.
+		systems.StepWeaponSelection(g.world, in)
+
+		if in.SelectWeapon1 || in.SelectWeapon2 || in.SelectWeapon3 ||
+			in.SelectWeapon4 || in.SelectWeapon5 || in.SelectWeapon6 ||
+			in.SelectWeapon7 {
+			g.menu.Open = false
+		}
+
+		cx, cy := g.world.Player.Center()
+		g.camera.Follow(cx, cy, cx, cy, 0)
+		return nil
+	}
 
 	systems.StepPlayer(g.world, in)
 	systems.StepWeaponSelection(g.world, in)
@@ -64,6 +90,8 @@ func (g *Game) Draw(r SceneRenderer) {
 	for _, wall := range w.Walls {
 		r.DrawRect(wall.X, wall.Y, wall.W, wall.H, ColorWall)
 	}
+
+	drawSpawnZone(r, w, g.ticks)
 
 	for _, b := range w.Bullets {
 		alpha := uint8(int(255) * b.Life / b.MaxLife)
@@ -130,10 +158,19 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	// HUD.
-	r.DrawText("Sqwave — WASD: move, Space: dash(shield), LMB: fire, 1..7: weapon", 8, 8)
+	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, E: menu", 8, 8)
 	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
 	if p.IsAiming() {
 		r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
+	}
+	if w.PlayerInSpawnZone() && !g.menu.Open {
+		r.DrawScreenText("[E] choose weapon", 8, 60, ColorSpawnZone)
+	}
+
+	drawHPBar(r, p.HP, world.PlayerMaxHP)
+
+	if g.menu.Open {
+		drawMenu(r, p.Weapon)
 	}
 }
 
@@ -226,4 +263,83 @@ func drawThrust(r SceneRenderer, p *world.Player, pcx, pcy float64) {
 	size := p.Swing.Weapon.Stats().BladeWidth
 	size *= 1.0 + 0.15*reach
 	r.DrawRect(hx-size/2, hy-size/2, size, size, ColorShield)
+}
+
+func drawHPBar(r SceneRenderer, hp, maxHP int) {
+	const (
+		barW = 220.0
+		barH = 18.0
+	)
+	x := 8.0
+	y := float64(world.ScreenHeight) - barH - 12
+
+	r.DrawScreenRect(x-2, y-2, barW+4, barH+4, ColorHPBack)
+
+	ratio := 0.0
+	if maxHP > 0 {
+		ratio = float64(hp) / float64(maxHP)
+	}
+	if ratio < 0 {
+		ratio = 0
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+
+	c := ColorHPFull
+	switch {
+	case ratio < 0.3:
+		c = ColorHPLow
+	case ratio < 0.6:
+		c = ColorHPMid
+	}
+
+	if ratio > 0 {
+		r.DrawScreenRect(x, y, barW*ratio, barH, c)
+	}
+	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+1, ColorMenuText)
+}
+
+// drawSpawnZone рисует пульсирующую сферу в центре зоны спавна.
+// Слои кругов с разной альфой дают мягкий градиент без шейдеров,
+// а синус от ticks задаёт плавную пульсацию размера и яркости.
+func drawSpawnZone(r SceneRenderer, w *world.World, ticks int) {
+	z := w.SpawnZone
+	cx := z.X + z.W/2
+	cy := z.Y + z.H/2
+	baseR := z.W / 2
+
+	// phase = 0.07 * ticks → период ≈ 90 тиков ≈ 1.5 сек при 60 TPS.
+	phase := float64(ticks) * 0.07
+	pulse := math.Sin(phase) // -1..1
+
+	// Радиус и общая яркость пульсируют в фазе.
+	radius := baseR + 10*pulse
+	brightness := 0.55 + 0.45*pulse // 0.1..1.0
+
+	// Слои от внешнего к внутреннему — мягкая сфера.
+	// Альфа слоёв и множитель к радиусу подобраны так, чтобы
+	// получился градиент: тускло по краю, плотнее к центру.
+	layers := []struct {
+		scale float64
+		alpha float64
+	}{
+		{1.15, 0.20},
+		{1.00, 0.35},
+		{0.78, 0.35},
+		{0.50, 0.40},
+		{0.22, 0.55},
+	}
+	for _, l := range layers {
+		c := ColorSpawnZone
+		a := l.alpha * brightness
+		if a < 0 {
+			a = 0
+		}
+		if a > 1 {
+			a = 1
+		}
+		c.A = uint8(255 * a)
+		r.DrawCircle(cx, cy, radius*l.scale, c)
+	}
 }

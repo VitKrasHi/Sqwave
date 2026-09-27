@@ -5,7 +5,9 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"golang.org/x/image/font/basicfont"
 )
 
 type Renderer struct {
@@ -73,4 +75,13 @@ func (r *Renderer) DrawText(text string, x, y float64) {
 func (r *Renderer) DrawCircle(x, y, radius float64, c color.NRGBA) {
 	sx, sy := r.w2s(x, y)
 	vector.DrawFilledCircle(r.screen, float32(sx), float32(sy), float32(radius*r.zoom), c, true)
+}
+
+var screenTextFace = text.NewGoXFace(basicfont.Face7x13)
+
+func (r *Renderer) DrawScreenText(s string, x, y float64, c color.NRGBA) {
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(c)
+	text.Draw(r.screen, s, screenTextFace, op)
 }
