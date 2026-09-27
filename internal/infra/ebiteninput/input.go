@@ -27,6 +27,7 @@ func (s *Source) Poll() input.PlayerInput {
 		SelectWeapon4: inpututil.IsKeyJustPressed(ebiten.Key4),
 		SelectWeapon5: inpututil.IsKeyJustPressed(ebiten.Key5),
 		SelectWeapon6: inpututil.IsKeyJustPressed(ebiten.Key6),
+		SelectWeapon7: inpututil.IsKeyJustPressed(ebiten.Key7),
 		AimX:          float64(mx),
 		AimY:          float64(my),
 	}

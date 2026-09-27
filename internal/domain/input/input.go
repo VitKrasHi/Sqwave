@@ -11,5 +11,6 @@ type PlayerInput struct {
 	SelectWeapon4         bool
 	SelectWeapon5         bool
 	SelectWeapon6         bool
+	SelectWeapon7         bool
 	AimX, AimY            float64
 }

@@ -31,6 +31,9 @@ var (
 
 	ColorSword      = color.NRGBA{R: 220, G: 240, B: 255, A: 255}
 	ColorSwordTrail = color.NRGBA{R: 140, G: 200, B: 255, A: 180}
+
+	ColorShield      = color.NRGBA{R: 170, G: 190, B: 220, A: 255}
+	ColorShieldTrail = color.NRGBA{R: 110, G: 130, B: 165, A: 170}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
@@ -59,6 +62,20 @@ func bulletTrailColor(w world.WeaponType) color.NRGBA {
 	default:
 		return ColorPistolTrail
 	}
+}
+
+func meleeColor(w world.WeaponType) color.NRGBA {
+	if w.IsShield() {
+		return ColorShield
+	}
+	return ColorSword
+}
+
+func meleeTrailColor(w world.WeaponType) color.NRGBA {
+	if w.IsShield() {
+		return ColorShieldTrail
+	}
+	return ColorSwordTrail
 }
 
 type SceneRenderer interface {

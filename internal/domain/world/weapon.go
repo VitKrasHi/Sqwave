@@ -9,6 +9,7 @@ const (
 	WeaponSniper
 	WeaponRocket
 	WeaponSword
+	WeaponShield
 )
 
 type WeaponStats struct {
@@ -26,12 +27,15 @@ type WeaponStats struct {
 	ExplosionRadius float64
 	ExplosionLife   int
 
-	// Melee > 0 — оружие ближнего боя. Вместо выстрела запускает
-	// проворот клинка в секторе MeleeArc градусов на дистанцию MeleeRange.
 	MeleeRange    float64
-	MeleeArc      float64 // полный угол проворота в градусах
-	SwingDuration int     // длительность проворота в тиках
-	BladeWidth    float64 // толщина клинка для визуала
+	MeleeArc      float64
+	SwingDuration int
+	BladeWidth    float64
+	IsShield      bool
+
+	// IsThrust — melee-атака «толчок»: не крутит дугу,
+	// а выдвигает оружие вперёд по направлению курсора и возвращает назад.
+	IsThrust bool
 }
 
 var weapons = map[WeaponType]WeaponStats{
@@ -70,6 +74,16 @@ var weapons = map[WeaponType]WeaponStats{
 		SwingDuration: 12,
 		BladeWidth:    6,
 	},
+	WeaponShield: {
+		Name:          "Shield",
+		FireCooldown:  30,
+		MeleeRange:    58, // докуда выдвигается щит
+		MeleeArc:      0,  // толчок — дуги нет
+		SwingDuration: 10, // чуть медленнее для ощутимости
+		BladeWidth:    18, // сам щит — квадрат 18×18
+		IsShield:      true,
+		IsThrust:      true,
+	},
 }
 
 func (w WeaponType) Stats() WeaponStats {
@@ -79,4 +93,8 @@ func (w WeaponType) Stats() WeaponStats {
 // IsMelee — вспомогательный предикат, чтобы не проверять MeleeRange > 0 в каждом месте.
 func (w WeaponType) IsMelee() bool {
 	return w.Stats().MeleeRange > 0
+}
+
+func (w WeaponType) IsShield() bool {
+	return w.Stats().IsShield
 }

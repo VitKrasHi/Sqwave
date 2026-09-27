@@ -36,7 +36,8 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		dy /= l
 	}
 
-	if in.Dash && p.DashCooldownTimer == 0 && (dx != 0 || dy != 0) {
+	// Рывок — только с щитом в руках.
+	if in.Dash && p.DashCooldownTimer == 0 && p.Weapon.IsShield() && (dx != 0 || dy != 0) {
 		p.DashTimer = world.DashDuration
 		p.DashCooldownTimer = world.DashCooldown
 	}
@@ -48,16 +49,26 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		speed = world.PlayerAimSpeed
 	}
 
-	moveX(w, dx*speed)
-	moveY(w, dy*speed)
+	blocked := moveX(w, dx*speed)
+	if moveY(w, dy*speed) {
+		blocked = true
+	}
+
+	// Врезались в стену во время рывка — рывок прекращается.
+	if p.Dashing() && blocked {
+		p.DashTimer = 0
+	}
 }
 
-func moveX(w *world.World, dx float64) {
+// moveX двигает игрока по X и возвращает true, если движение
+// было ограничено стеной или границей мира.
+func moveX(w *world.World, dx float64) bool {
 	if dx == 0 {
-		return
+		return false
 	}
 	p := &w.Player
 	targetX := p.X + dx
+	blocked := false
 
 	for _, wall := range w.Walls {
 		if p.Y >= wall.Y+wall.H || p.Y+world.PlayerSize <= wall.Y {
@@ -69,6 +80,7 @@ func moveX(w *world.World, dx float64) {
 			}
 			if limit := wall.X - world.PlayerSize; limit < targetX {
 				targetX = limit
+				blocked = true
 			}
 		} else {
 			if wall.X+wall.W > p.X {
@@ -76,25 +88,32 @@ func moveX(w *world.World, dx float64) {
 			}
 			if limit := wall.X + wall.W; limit > targetX {
 				targetX = limit
+				blocked = true
 			}
 		}
 	}
 
 	if targetX < 0 {
 		targetX = 0
+		blocked = true
 	}
 	if targetX+world.PlayerSize > world.WorldWidth {
 		targetX = world.WorldWidth - world.PlayerSize
+		blocked = true
 	}
+
 	p.X = targetX
+	return blocked
 }
 
-func moveY(w *world.World, dy float64) {
+// moveY — аналог для вертикали.
+func moveY(w *world.World, dy float64) bool {
 	if dy == 0 {
-		return
+		return false
 	}
 	p := &w.Player
 	targetY := p.Y + dy
+	blocked := false
 
 	for _, wall := range w.Walls {
 		if p.X >= wall.X+wall.W || p.X+world.PlayerSize <= wall.X {
@@ -106,6 +125,7 @@ func moveY(w *world.World, dy float64) {
 			}
 			if limit := wall.Y - world.PlayerSize; limit < targetY {
 				targetY = limit
+				blocked = true
 			}
 		} else {
 			if wall.Y+wall.H > p.Y {
@@ -113,15 +133,20 @@ func moveY(w *world.World, dy float64) {
 			}
 			if limit := wall.Y + wall.H; limit > targetY {
 				targetY = limit
+				blocked = true
 			}
 		}
 	}
 
 	if targetY < 0 {
 		targetY = 0
+		blocked = true
 	}
 	if targetY+world.PlayerSize > world.WorldHeight {
 		targetY = world.WorldHeight - world.PlayerSize
+		blocked = true
 	}
+
 	p.Y = targetY
+	return blocked
 }

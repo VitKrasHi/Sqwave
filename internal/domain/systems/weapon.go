@@ -26,9 +26,17 @@ func StepWeaponSelection(w *world.World, in input.PlayerInput) {
 	if in.SelectWeapon6 {
 		w.Player.Weapon = world.WeaponSword
 	}
+	if in.SelectWeapon7 {
+		w.Player.Weapon = world.WeaponShield
+	}
 
 	if w.Player.Weapon != old {
 		w.Player.AimCharge = 0
-		w.Player.Swing.Active = false // отменяем проворот при смене оружия
+		w.Player.Swing.Active = false
+
+		// Если ушли с щита — активный рывок обрывается.
+		if !w.Player.Weapon.IsShield() {
+			w.Player.DashTimer = 0
+		}
 	}
 }
