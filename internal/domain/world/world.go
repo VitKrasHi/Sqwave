@@ -26,9 +26,11 @@ func NewWithSeed(seed int64) *World {
 	spawnSize := SpawnZoneSize
 	return &World{
 		Player: Player{
-			X:  WorldWidth/2 - PlayerSize/2,
-			Y:  WorldHeight/2 - PlayerSize/2,
-			HP: PlayerMaxHP,
+			X:         WorldWidth/2 - PlayerSize/2,
+			Y:         WorldHeight/2 - PlayerSize/2,
+			HP:        PlayerMaxHP,
+			Weapon:    WeaponNone,
+			Secondary: WeaponNone,
 		},
 		Walls: defaultWalls(),
 		SpawnZone: geometry.Rect{

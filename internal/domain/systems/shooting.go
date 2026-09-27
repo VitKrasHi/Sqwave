@@ -11,6 +11,10 @@ import (
 
 func StepShooting(w *world.World, in input.PlayerInput) {
 	p := &w.Player
+	if !p.HasWeapon() {
+		return
+	}
+
 	if p.FireCooldownTimer > 0 {
 		p.FireCooldownTimer--
 	}

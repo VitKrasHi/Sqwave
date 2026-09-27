@@ -16,7 +16,8 @@ type Player struct {
 	X, Y              float64
 	DashTimer         int
 	DashCooldownTimer int
-	Weapon            WeaponType
+	Weapon            WeaponType // активный слот
+	Secondary         WeaponType // второй слот
 	FireCooldownTimer int
 	AimCharge         int
 	Swing             SwingState
@@ -110,4 +111,40 @@ func (p *Player) HPRatio() float64 {
 		return 1
 	}
 	return r
+}
+
+func (p *Player) HasWeapon() bool {
+	return p.Weapon != WeaponNone
+}
+
+// SwapWeapon меняет активный слот со второстепенным.
+// Не делает ничего, если второй слот пуст.
+func (p *Player) SwapWeapon() {
+	if p.Secondary == WeaponNone {
+		return
+	}
+	p.Weapon, p.Secondary = p.Secondary, p.Weapon
+	p.resetWeaponState()
+}
+
+// EquipPrimary ставит оружие в активный слот и сбрасывает
+// состояние, привязанное к предыдущему оружию.
+func (p *Player) EquipPrimary(w WeaponType) {
+	p.Weapon = w
+	p.resetWeaponState()
+	p.FireCooldownTimer = 0
+}
+
+// EquipSecondary кладёт оружие во второстепенный слот.
+// Активный слот не трогает.
+func (p *Player) EquipSecondary(w WeaponType) {
+	p.Secondary = w
+}
+
+func (p *Player) resetWeaponState() {
+	p.AimCharge = 0
+	p.Swing.Active = false
+	if !p.Weapon.IsShield() {
+		p.DashTimer = 0
+	}
 }

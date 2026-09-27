@@ -31,6 +31,10 @@ func New(w *world.World, in InputSource) *Game {
 	}
 	cx, cy := w.Player.Center()
 	g.camera.Follow(cx, cy, cx, cy, 0)
+	if !w.Player.HasWeapon() {
+		g.menu.Open = true
+		g.menu.Reset(&w.Player)
+	}
 	return g
 }
 
@@ -38,32 +42,23 @@ func (g *Game) Update() error {
 	g.ticks++
 
 	in := g.input.Poll()
-
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y
-
 	g.lastInput = in
 
-	// Открыть/закрыть меню.
-	if in.Interact {
-		if g.menu.Open {
-			g.menu.Open = false
-		} else if g.world.PlayerInSpawnZone() {
-			g.menu.Open = true
-		}
+	// Открыть меню.
+	if in.Interact && !g.menu.Open && g.world.PlayerInSpawnZone() {
+		g.menu.Open = true
+		g.menu.Reset(&g.world.Player)
+		cx, cy := g.world.Player.Center()
+		g.camera.Follow(cx, cy, cx, cy, 0)
+		return nil
 	}
 
 	if g.menu.Open {
-		// Игрок «заморожен»: не двигается, не стреляет, ничего не летит.
-		// Работает только выбор оружия.
-		systems.StepWeaponSelection(g.world, in)
-
-		if in.SelectWeapon1 || in.SelectWeapon2 || in.SelectWeapon3 ||
-			in.SelectWeapon4 || in.SelectWeapon5 || in.SelectWeapon6 ||
-			in.SelectWeapon7 {
+		if handleMenuInput(g.world, &g.menu, in) {
 			g.menu.Open = false
 		}
-
 		cx, cy := g.world.Player.Center()
 		g.camera.Follow(cx, cy, cx, cy, 0)
 		return nil
@@ -158,8 +153,8 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	// HUD.
-	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, E: menu", 8, 8)
-	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
+	r.DrawText("Sqwave — WASD move, Space dash, LMB fire, Q swap, E menu", 8, 8)
+	r.DrawText(formatLoadout(&w.Player), 8, 24)
 	if p.IsAiming() {
 		r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
 	}
@@ -170,7 +165,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	drawHPBar(r, p.HP, world.PlayerMaxHP)
 
 	if g.menu.Open {
-		drawMenu(r, p.Weapon)
+		drawMenu(r, &g.menu, p)
 	}
 }
 
@@ -342,4 +337,16 @@ func drawSpawnZone(r SceneRenderer, w *world.World, ticks int) {
 		c.A = uint8(255 * a)
 		r.DrawCircle(cx, cy, radius*l.scale, c)
 	}
+}
+
+func formatLoadout(p *world.Player) string {
+	a := "—"
+	b := "—"
+	if p.Weapon != world.WeaponNone {
+		a = p.Weapon.Stats().Name
+	}
+	if p.Secondary != world.WeaponNone {
+		b = p.Secondary.Stats().Name
+	}
+	return fmt.Sprintf("[%s]  %s  (Q to swap)", a, b)
 }

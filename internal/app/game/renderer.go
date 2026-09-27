@@ -49,6 +49,8 @@ var (
 	ColorMenuBorder   = color.NRGBA{R: 90, G: 140, B: 200, A: 255}
 	ColorMenuText     = color.NRGBA{R: 220, G: 220, B: 220, A: 255}
 	ColorMenuSelected = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
+
+	ColorMenuDim = color.NRGBA{R: 130, G: 130, B: 140, A: 255}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

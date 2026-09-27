@@ -86,15 +86,23 @@ var weapons = map[WeaponType]WeaponStats{
 	},
 }
 
+const WeaponNone WeaponType = -1
+
 func (w WeaponType) Stats() WeaponStats {
-	return weapons[w]
+	if s, ok := weapons[w]; ok {
+		return s
+	}
+	return WeaponStats{Name: "Unarmed"}
 }
 
-// IsMelee — вспомогательный предикат, чтобы не проверять MeleeRange > 0 в каждом месте.
 func (w WeaponType) IsMelee() bool {
 	return w.Stats().MeleeRange > 0
 }
 
 func (w WeaponType) IsShield() bool {
 	return w.Stats().IsShield
+}
+
+func (w WeaponType) IsNone() bool {
+	return w == WeaponNone
 }

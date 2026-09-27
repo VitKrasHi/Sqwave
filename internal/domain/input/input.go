@@ -5,13 +5,10 @@ type PlayerInput struct {
 	Dash                  bool
 	Fire                  bool
 	FireReleased          bool
+	SwapWeapon            bool
 	Interact              bool
-	SelectWeapon1         bool
-	SelectWeapon2         bool
-	SelectWeapon3         bool
-	SelectWeapon4         bool
-	SelectWeapon5         bool
-	SelectWeapon6         bool
-	SelectWeapon7         bool
+	MenuUp                bool // стрелка вверх / W
+	MenuDown              bool // стрелка вниз / S
+	MenuConfirm           bool // Enter / Space
 	AimX, AimY            float64
 }
