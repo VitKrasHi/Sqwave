@@ -20,4 +20,7 @@ const (
 
 	DashDuration = 8
 	DashCooldown = 40
+
+	EnemyBaseSpeed  = 1.5
+	EnemySpeedPerSP = 0.02
 )

@@ -21,11 +21,8 @@ type Player struct {
 	FireCooldownTimer int
 	AimCharge         int
 	Swing             SwingState
-
-	// Damage — накопленный урон. Текущее HP = MaxHP() - Damage.
-	// Такая модель позволяет менять состав оружия без потери
-	// «прогресса» урона: взял больше HP — тот же урон, больше запас.
-	Damage int
+	SwingID           int // увеличивается при каждом новом замахе
+	Damage            int
 }
 
 func (p *Player) Rect() geometry.Rect {

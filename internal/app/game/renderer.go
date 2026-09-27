@@ -51,6 +51,13 @@ var (
 	ColorMenuSelected = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
 
 	ColorMenuDim = color.NRGBA{R: 130, G: 130, B: 140, A: 255}
+
+	// Враги
+	ColorEnemy       = color.NRGBA{R: 200, G: 60, B: 60, A: 255}
+	ColorEnemySwing  = color.NRGBA{R: 255, G: 110, B: 90, A: 255}
+	ColorEnemySword  = color.NRGBA{R: 255, G: 220, B: 220, A: 255}
+	ColorEnemyFacing = color.NRGBA{R: 255, G: 160, B: 160, A: 200}
+	ColorEnemyHPBack = color.NRGBA{R: 30, G: 15, B: 15, A: 200}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

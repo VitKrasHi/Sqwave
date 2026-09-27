@@ -70,6 +70,7 @@ func (g *Game) Update() error {
 	systems.StepBullets(g.world)
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
+	systems.StepEnemies(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -121,6 +122,8 @@ func (g *Game) Draw(r SceneRenderer) {
 		c.A = alpha
 		r.DrawCircle(e.X, e.Y, radius, c)
 	}
+
+	drawEnemies(r, w)
 
 	p := &w.Player
 	playerColor := ColorPlayer
@@ -349,4 +352,71 @@ func formatLoadout(p *world.Player) string {
 		b = p.Secondary.Stats().Name
 	}
 	return fmt.Sprintf("[%s]  %s  (Q to swap)", a, b)
+}
+
+func drawEnemies(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		stats := e.Type.Stats()
+
+		c := ColorEnemy
+		if e.SwingActive {
+			c = ColorEnemySwing
+		}
+		r.DrawRect(e.X, e.Y, stats.Size, stats.Size, c)
+
+		// Взгляд — короткий штрих из центра.
+		cx, cy := e.Center()
+		r.DrawLine(cx, cy,
+			cx+e.FacingX*stats.Size/2,
+			cy+e.FacingY*stats.Size/2,
+			2, ColorEnemyFacing)
+
+		drawEnemyHPBar(r, e)
+		drawEnemySwing(r, e)
+	}
+}
+
+func drawEnemyHPBar(r SceneRenderer, e *world.Enemy) {
+	stats := e.Type.Stats()
+	const barH = 4.0
+	barW := stats.Size
+	x := e.X
+	y := e.Y - barH - 3
+
+	r.DrawRect(x-1, y-1, barW+2, barH+2, ColorEnemyHPBack)
+
+	ratio := e.HPRatio()
+	if ratio <= 0 {
+		return
+	}
+	c := ColorHPFull
+	switch {
+	case ratio < 0.3:
+		c = ColorHPLow
+	case ratio < 0.6:
+		c = ColorHPMid
+	}
+	r.DrawRect(x, y, barW*ratio, barH, c)
+}
+
+// drawEnemySwing — меч врага проворачивается вперёд в сторону игрока.
+// Угол идёт от −45° до +45° относительно направления взгляда.
+func drawEnemySwing(r SceneRenderer, e *world.Enemy) {
+	if !e.SwingActive {
+		return
+	}
+	stats := e.Type.Stats()
+	if stats.SwingDuration <= 0 {
+		return
+	}
+
+	progress := float64(e.SwingTimer) / float64(stats.SwingDuration)
+	baseAngle := math.Atan2(e.FacingY, e.FacingX)
+	angle := baseAngle - 0.8 + 1.6*progress // -0.8 → +0.8 рад
+
+	cx, cy := e.Center()
+	endX := cx + math.Cos(angle)*stats.MeleeRange
+	endY := cy + math.Sin(angle)*stats.MeleeRange
+	r.DrawLine(cx, cy, endX, endY, 4, ColorEnemySword)
 }

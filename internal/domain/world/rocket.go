@@ -6,11 +6,12 @@ import "Sqwave/internal/domain/geometry"
 // летит тик за тиком, пока не столкнётся со стеной, не выйдет
 // за пределы мира или не истечёт Life.
 type Rocket struct {
-	X, Y    float64 // центр
+	X, Y    float64
 	VX, VY  float64
 	Size    float64
 	Life    int
 	MaxLife int
+	Weapon  WeaponType // NEW
 
 	ExplosionRadius float64
 	ExplosionLife   int

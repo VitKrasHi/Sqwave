@@ -9,6 +9,7 @@ import (
 
 type World struct {
 	Player     Player
+	Enemies    []Enemy
 	Bullets    []Bullet
 	Rockets    []Rocket
 	Explosions []Explosion
@@ -31,7 +32,8 @@ func NewWithSeed(seed int64) *World {
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
 		},
-		Walls: defaultWalls(),
+		Enemies: defaultEnemies(),
+		Walls:   defaultWalls(),
 		SpawnZone: geometry.Rect{
 			X: WorldWidth/2 - spawnSize/2,
 			Y: WorldHeight/2 - spawnSize/2,
@@ -72,4 +74,17 @@ func defaultWalls() []geometry.Rect {
 		{X: 1700, Y: 400, W: t, H: 300},
 		{X: 900, Y: 1100, W: t, H: 300},
 	}
+}
+
+func defaultEnemies() []Enemy {
+	positions := []struct{ x, y float64 }{
+		{400, 300},
+		{1600, 300},
+		{1000, 1200},
+	}
+	enemies := make([]Enemy, 0, len(positions))
+	for _, p := range positions {
+		enemies = append(enemies, NewEnemy(EnemyInfantry, p.x, p.y))
+	}
+	return enemies
 }
