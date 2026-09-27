@@ -69,3 +69,8 @@ func (r *Renderer) DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRG
 func (r *Renderer) DrawText(text string, x, y float64) {
 	ebitenutil.DebugPrintAt(r.screen, text, int(x), int(y))
 }
+
+func (r *Renderer) DrawCircle(x, y, radius float64, c color.NRGBA) {
+	sx, sy := r.w2s(x, y)
+	vector.DrawFilledCircle(r.screen, float32(sx), float32(sy), float32(radius*r.zoom), c, true)
+}

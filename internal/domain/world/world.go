@@ -8,10 +8,12 @@ import (
 )
 
 type World struct {
-	Player  Player
-	Bullets []Bullet
-	Walls   []geometry.Rect
-	Rng     *rand.Rand
+	Player     Player
+	Bullets    []Bullet
+	Rockets    []Rocket
+	Explosions []Explosion
+	Walls      []geometry.Rect
+	Rng        *rand.Rand
 }
 
 func New() *World {

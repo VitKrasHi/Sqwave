@@ -46,6 +46,8 @@ func (g *Game) Update() error {
 	systems.StepWeaponSelection(g.world, in)
 	systems.StepShooting(g.world, in)
 	systems.StepBullets(g.world)
+	systems.StepRockets(g.world)
+	systems.StepExplosions(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -73,6 +75,29 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawRect(b.EndX-2, b.EndY-2, 4, 4, tip)
 	}
 
+	// Ракеты: хвост назад по вектору скорости + яркая «голова».
+	for _, rocket := range w.Rockets {
+		l := math.Hypot(rocket.VX, rocket.VY)
+		if l == 0 {
+			continue
+		}
+		tailLen := 14.0
+		tailX := rocket.X - rocket.VX/l*tailLen
+		tailY := rocket.Y - rocket.VY/l*tailLen
+		r.DrawLine(tailX, tailY, rocket.X, rocket.Y, 3, ColorRocketTrail)
+		r.DrawRect(rocket.X-rocket.Size/2, rocket.Y-rocket.Size/2, rocket.Size, rocket.Size, ColorRocketBullet)
+	}
+
+	// Взрывы: круг расширяется в первой трети жизни, затем плавно гаснет.
+	for _, e := range w.Explosions {
+		progress := 1 - float64(e.Life)/float64(e.MaxLife) // 0 → 1
+		radius := e.Radius * math.Min(progress*3, 1)
+		alpha := uint8(255 * (1 - progress))
+		c := ColorExplosion
+		c.A = alpha
+		r.DrawCircle(e.X, e.Y, radius, c)
+	}
+
 	p := &w.Player
 	playerColor := ColorPlayer
 	if p.Dashing() {
@@ -95,7 +120,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	// HUD.
-	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2/3/4: weapon", 8, 8)
+	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2/3/4/5: weapon", 8, 8)
 	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
 	if p.IsAiming() {
 		r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)

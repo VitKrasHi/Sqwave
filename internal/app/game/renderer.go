@@ -24,6 +24,10 @@ var (
 
 	ColorSniperBullet = color.NRGBA{R: 220, G: 220, B: 255, A: 255}
 	ColorSniperTrail  = color.NRGBA{R: 180, G: 180, B: 255, A: 200}
+
+	ColorRocketBullet = color.NRGBA{R: 255, G: 80, B: 60, A: 255}
+	ColorRocketTrail  = color.NRGBA{R: 255, G: 120, B: 40, A: 180}
+	ColorExplosion    = color.NRGBA{R: 255, G: 180, B: 60, A: 255}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
@@ -34,6 +38,8 @@ func bulletColor(w world.WeaponType) color.NRGBA {
 		return ColorShotgunBullet
 	case world.WeaponSniper:
 		return ColorSniperBullet
+	case world.WeaponRocket:
+		return ColorRocketBullet
 	default:
 		return ColorPistolBullet
 	}
@@ -54,16 +60,12 @@ func bulletTrailColor(w world.WeaponType) color.NRGBA {
 
 type SceneRenderer interface {
 	Clear(c color.NRGBA)
-
-	// SetCamera задаёт мировую точку в центре экрана и масштаб.
-	// Влияет только на DrawRect и DrawLine.
 	SetCamera(x, y, zoom float64)
 
-	// DrawRect и DrawLine принимают мировые координаты.
 	DrawRect(x, y, w, h float64, c color.NRGBA)
 	DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
+	DrawCircle(x, y, r float64, c color.NRGBA)
 
-	// Screen-space — для оверлеев и HUD (не зависят от камеры и зума).
 	DrawScreenRect(x, y, w, h float64, c color.NRGBA)
 	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawText(text string, x, y float64)

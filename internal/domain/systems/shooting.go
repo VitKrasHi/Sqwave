@@ -36,7 +36,12 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	baseAngle := math.Atan2(aimDY, aimDX)
 
 	for i := 0; i < weapon.Pellets; i++ {
-		fireRay(w, cx, cy, baseAngle+spreadOffset(w.Rng, weapon.Spread))
+		angle := baseAngle + spreadOffset(w.Rng, weapon.Spread)
+		if weapon.ProjectileSpeed > 0 {
+			spawnRocket(w, cx, cy, angle, weapon)
+		} else {
+			fireRay(w, cx, cy, angle)
+		}
 	}
 
 	p.FireCooldownTimer = weapon.FireCooldown
@@ -112,4 +117,24 @@ func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
 	}
 	half := spreadDeg * math.Pi / 360
 	return (rng.Float64()*2 - 1) * half
+}
+
+// spawnRocket создаёт движущийся снаряд. Life вычисляется так,
+// чтобы запас хода соответствовал weapon.Range.
+func spawnRocket(w *world.World, cx, cy, angle float64, weapon world.WeaponStats) {
+	life := int(weapon.Range / weapon.ProjectileSpeed)
+	if life <= 0 {
+		life = 60
+	}
+	w.Rockets = append(w.Rockets, world.Rocket{
+		X:               cx,
+		Y:               cy,
+		VX:              math.Cos(angle) * weapon.ProjectileSpeed,
+		VY:              math.Sin(angle) * weapon.ProjectileSpeed,
+		Size:            weapon.ProjectileSize,
+		Life:            life,
+		MaxLife:         life,
+		ExplosionRadius: weapon.ExplosionRadius,
+		ExplosionLife:   weapon.ExplosionLife,
+	})
 }

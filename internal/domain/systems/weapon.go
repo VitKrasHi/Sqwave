@@ -20,6 +20,9 @@ func StepWeaponSelection(w *world.World, in input.PlayerInput) {
 	if in.SelectWeapon4 {
 		w.Player.Weapon = world.WeaponSniper
 	}
+	if in.SelectWeapon5 {
+		w.Player.Weapon = world.WeaponRocket
+	}
 
 	if w.Player.Weapon != old {
 		w.Player.AimCharge = 0
