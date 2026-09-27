@@ -23,6 +23,11 @@ type Player struct {
 	Swing             SwingState
 	SwingID           int // увеличивается при каждом новом замахе
 	Damage            int
+	// AimX, AimY — мировая точка прицела. Обновляется каждый тик.
+	AimX, AimY float64
+
+	// IsFiring — удерживается ли ЛКМ.
+	IsFiring bool
 }
 
 func (p *Player) Rect() geometry.Rect {

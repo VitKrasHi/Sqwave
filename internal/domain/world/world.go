@@ -91,6 +91,7 @@ func defaultEnemies() []Enemy {
 		{EnemyInfantry, 1000, 1200},
 		{EnemyShooter, 300, 1200},
 		{EnemyShooter, 1700, 1100},
+		{EnemyScout, 700, 900},
 	}
 	enemies := make([]Enemy, 0, len(spawns))
 	for _, s := range spawns {

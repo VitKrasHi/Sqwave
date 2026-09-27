@@ -9,6 +9,9 @@ import (
 
 func StepPlayer(w *world.World, in input.PlayerInput) {
 	p := &w.Player
+	p.AimX = in.AimX
+	p.AimY = in.AimY
+	p.IsFiring = in.Fire
 
 	if p.DashCooldownTimer > 0 {
 		p.DashCooldownTimer--

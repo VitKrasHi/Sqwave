@@ -365,9 +365,18 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 		e := &w.Enemies[i]
 		stats := e.Type.Stats()
 
-		c := ColorEnemy
-		if e.Type == world.EnemyShooter {
+		var c color.NRGBA
+		switch e.Type {
+		case world.EnemyShooter:
 			c = ColorShooter
+		case world.EnemyScout:
+			if e.RecentlyHitTimer > 0 {
+				c = ColorScoutFlee
+			} else {
+				c = ColorScout
+			}
+		default:
+			c = ColorEnemy
 		}
 		if e.SwingActive {
 			if e.Type == world.EnemyShooter {

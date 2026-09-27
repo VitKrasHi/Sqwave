@@ -7,6 +7,7 @@ type EnemyType int
 const (
 	EnemyInfantry EnemyType = iota
 	EnemyShooter
+	EnemyScout
 )
 
 type EnemyStats struct {
@@ -21,12 +22,13 @@ type EnemyStats struct {
 	AttackCooldownMax int
 	SwingDuration     int
 
-	// Для стрелка.
-	PreferredMin    float64
-	PreferredMax    float64
-	ProjectileSpeed float64
-	ProjectileSize  float64
-	ProjectileLife  int
+	PreferredMin     float64
+	PreferredMax     float64
+	ProjectileSpeed  float64
+	ProjectileSize   float64
+	ProjectileLife   int
+	ProjectileCount  int     // пеллет за выстрел (дробовик разведчика = 8)
+	ProjectileSpread float64 // полный угол разброса в градусах
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -55,6 +57,21 @@ var enemyStats = map[EnemyType]EnemyStats{
 		ProjectileSpeed:   25, // было 4 — почти вдвое быстрее
 		ProjectileSize:    8,
 		ProjectileLife:    90, // было 150 — короче, чтобы не летели через пол-карты
+	},
+	EnemyScout: {
+		Name:              "Scout",
+		MaxHP:             70,
+		SP:                200,
+		Damage:            10, // на пеллету, 8 пеллет — до 80 в упор
+		Size:              20,
+		MeleeRange:        60, // дистанция выстрела дробью
+		AttackCooldownMin: 50,
+		AttackCooldownMax: 90,
+		ProjectileSpeed:   9,
+		ProjectileSize:    4,
+		ProjectileLife:    20, // короткая жизнь — дробь летит недалеко
+		ProjectileCount:   8,
+		ProjectileSpread:  30,
 	},
 }
 
@@ -102,14 +119,34 @@ type Enemy struct {
 	// Кеш найденной позиции для стрельбы из-за укрытия.
 	ShootPosX, ShootPosY float64
 	ShootPosTimer        int
+	// Трекинг попаданий: если HP упало — недавно ранен.
+	LastHP int
+
+	RecentlyHitTimer int
+
+	// Разведчик: таймер для паттернов уклонения.
+	AITimer int
+
+	// Множитель скорости (используется разведчиком для рывков).
+	SpeedBurst int
+
+	// Разведчик: короткий рывок-уклонение.
+	DodgeTimer    int
+	DodgeDirX     float64
+	DodgeDirY     float64
+	DodgeCooldown int
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {
+	hp := t.Stats().MaxHP
 	return Enemy{
-		Type: t,
-		X:    x,
-		Y:    y,
-		HP:   t.Stats().MaxHP,
+		Type:   t,
+		X:      x,
+		Y:      y,
+		LastX:  x,
+		LastY:  y,
+		HP:     hp,
+		LastHP: hp,
 	}
 }
 

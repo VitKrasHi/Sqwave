@@ -62,6 +62,9 @@ var (
 	ColorShooter         = color.NRGBA{R: 160, G: 90, B: 220, A: 255}
 	ColorShooterSwing    = color.NRGBA{R: 200, G: 130, B: 255, A: 255}
 	ColorEnemyProjectile = color.NRGBA{R: 255, G: 120, B: 60, A: 255}
+
+	ColorScout     = color.NRGBA{R: 90, G: 220, B: 130, A: 255}
+	ColorScoutFlee = color.NRGBA{R: 140, G: 240, B: 170, A: 255} // когда ранен
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
