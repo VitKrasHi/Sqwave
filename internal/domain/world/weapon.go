@@ -8,6 +8,7 @@ const (
 	WeaponShotgun
 	WeaponSniper
 	WeaponRocket
+	WeaponSword
 )
 
 type WeaponStats struct {
@@ -19,14 +20,18 @@ type WeaponStats struct {
 	VisualLife   int
 	ChargeTime   int
 
-	// Projectile — если > 0, оружие стреляет движущимся снарядом,
-	// а не hitscan-лучом.
 	ProjectileSpeed float64
 	ProjectileSize  float64
 
-	// Explosion — если > 0, снаряд при столкновении создаёт зону.
 	ExplosionRadius float64
 	ExplosionLife   int
+
+	// Melee > 0 — оружие ближнего боя. Вместо выстрела запускает
+	// проворот клинка в секторе MeleeArc градусов на дистанцию MeleeRange.
+	MeleeRange    float64
+	MeleeArc      float64 // полный угол проворота в градусах
+	SwingDuration int     // длительность проворота в тиках
+	BladeWidth    float64 // толщина клинка для визуала
 }
 
 var weapons = map[WeaponType]WeaponStats{
@@ -57,8 +62,21 @@ var weapons = map[WeaponType]WeaponStats{
 		ExplosionRadius: 130,
 		ExplosionLife:   14,
 	},
+	WeaponSword: {
+		Name:          "Sword",
+		FireCooldown:  24,
+		MeleeRange:    82,
+		MeleeArc:      150,
+		SwingDuration: 12,
+		BladeWidth:    6,
+	},
 }
 
 func (w WeaponType) Stats() WeaponStats {
 	return weapons[w]
+}
+
+// IsMelee — вспомогательный предикат, чтобы не проверять MeleeRange > 0 в каждом месте.
+func (w WeaponType) IsMelee() bool {
+	return w.Stats().MeleeRange > 0
 }

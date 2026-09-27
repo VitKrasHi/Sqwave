@@ -23,8 +23,12 @@ func StepWeaponSelection(w *world.World, in input.PlayerInput) {
 	if in.SelectWeapon5 {
 		w.Player.Weapon = world.WeaponRocket
 	}
+	if in.SelectWeapon6 {
+		w.Player.Weapon = world.WeaponSword
+	}
 
 	if w.Player.Weapon != old {
 		w.Player.AimCharge = 0
+		w.Player.Swing.Active = false // отменяем проворот при смене оружия
 	}
 }

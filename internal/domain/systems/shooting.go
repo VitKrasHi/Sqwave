@@ -15,6 +15,11 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 		p.FireCooldownTimer--
 	}
 
+	if p.Weapon.IsMelee() {
+		stepMelee(w, in)
+		return
+	}
+
 	if p.Weapon == world.WeaponSniper {
 		stepSniper(w, in)
 		return
@@ -77,6 +82,44 @@ func stepSniper(w *world.World, in input.PlayerInput) {
 
 	default:
 		p.AimCharge = 0
+	}
+}
+
+func stepMelee(w *world.World, in input.PlayerInput) {
+	p := &w.Player
+	weapon := p.Weapon.Stats()
+
+	if p.Swing.Active {
+		p.Swing.Timer++
+		if p.Swing.Timer >= p.Swing.Duration {
+			p.Swing.Active = false
+			p.FireCooldownTimer = weapon.FireCooldown
+		}
+		return
+	}
+
+	if !in.Fire || p.FireCooldownTimer > 0 {
+		return
+	}
+
+	cx, cy := p.Center()
+	aimDX := in.AimX - cx
+	aimDY := in.AimY - cy
+	if aimDX == 0 && aimDY == 0 {
+		return
+	}
+
+	baseAngle := math.Atan2(aimDY, aimDX)
+	arcRad := weapon.MeleeArc * math.Pi / 180
+
+	p.Swing = world.SwingState{
+		Active:     true,
+		Timer:      0,
+		Duration:   weapon.SwingDuration,
+		StartAngle: baseAngle - arcRad/2, // проворот начинается «левее» курсора
+		ArcRadians: arcRad,
+		Range:      weapon.MeleeRange,
+		Weapon:     p.Weapon,
 	}
 }
 

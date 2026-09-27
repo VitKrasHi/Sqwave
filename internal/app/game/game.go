@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 
+	"Sqwave/internal/domain/geometry"
 	"Sqwave/internal/domain/input"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
@@ -119,8 +120,37 @@ func (g *Game) Draw(r SceneRenderer) {
 		drawScope(r)
 	}
 
+	// Меч: клинок + затухающий след проворота.
+	if p.Swing.Active {
+		swingAngle := p.CurrentSwingAngle()
+		progress := p.SwingProgress()
+
+		// След — несколько «прошлых» позиций клинка с уменьшающейся альфой.
+		const trailSteps = 6
+		const trailStep = 0.07
+		for i := trailSteps; i >= 1; i-- {
+			t := progress - float64(i)*trailStep
+			if t <= 0 {
+				continue
+			}
+			ang := p.Swing.StartAngle + p.Swing.ArcRadians*t
+			ex, ey := clipToWalls(w, pcx, pcy,
+				pcx+math.Cos(ang)*p.Swing.Range,
+				pcy+math.Sin(ang)*p.Swing.Range)
+			c := ColorSwordTrail
+			c.A = uint8(180 * (1 - float64(i)/float64(trailSteps)))
+			r.DrawLine(pcx, pcy, ex, ey, p.Swing.Range*0.05+2, c)
+		}
+
+		// Сам клинок.
+		endX, endY := clipToWalls(w, pcx, pcy,
+			pcx+math.Cos(swingAngle)*p.Swing.Range,
+			pcy+math.Sin(swingAngle)*p.Swing.Range)
+		r.DrawLine(pcx, pcy, endX, endY, 5, ColorSword)
+	}
+
 	// HUD.
-	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1/2/3/4/5: weapon", 8, 8)
+	r.DrawText("Sqwave — WASD: move, Space: dash, LMB: fire, 1..6: weapon", 8, 8)
 	r.DrawText(fmt.Sprintf("Current weapon: %s", p.Weapon.Stats().Name), 8, 24)
 	if p.IsAiming() {
 		r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
@@ -140,4 +170,19 @@ func drawScope(r SceneRenderer) {
 	r.DrawScreenLine(cx+6, cy, cx+18, cy, 1, cross)
 	r.DrawScreenLine(cx, cy-18, cx, cy-6, 1, cross)
 	r.DrawScreenLine(cx, cy+6, cx, cy+18, 1, cross)
+}
+
+// clipToWalls возвращает ближайшую точку пересечения отрезка со стенами
+// или исходный конец, если пересечений нет. Используется для визуальной
+// обрезки клинка и ракетного следа о препятствия.
+func clipToWalls(w *world.World, x1, y1, x2, y2 float64) (float64, float64) {
+	t := 1.0
+	for _, wall := range w.Walls {
+		if tt, ok := geometry.RaySegmentIntersectsRect(x1, y1, x2, y2, wall); ok {
+			if tt < t {
+				t = tt
+			}
+		}
+	}
+	return x1 + (x2-x1)*t, y1 + (y2-y1)*t
 }
