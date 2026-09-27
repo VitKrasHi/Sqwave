@@ -71,6 +71,8 @@ func (g *Game) Update() error {
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
 	systems.StepEnemies(g.world)
+	systems.StepEnemies(g.world)
+	systems.StepEnemyProjectiles(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -121,6 +123,10 @@ func (g *Game) Draw(r SceneRenderer) {
 		c := ColorExplosion
 		c.A = alpha
 		r.DrawCircle(e.X, e.Y, radius, c)
+	}
+
+	for _, proj := range w.EnemyProjectiles {
+		r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
 	}
 
 	drawEnemies(r, w)
@@ -360,8 +366,15 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 		stats := e.Type.Stats()
 
 		c := ColorEnemy
+		if e.Type == world.EnemyShooter {
+			c = ColorShooter
+		}
 		if e.SwingActive {
-			c = ColorEnemySwing
+			if e.Type == world.EnemyShooter {
+				c = ColorShooterSwing
+			} else {
+				c = ColorEnemySwing
+			}
 		}
 		r.DrawRect(e.X, e.Y, stats.Size, stats.Size, c)
 

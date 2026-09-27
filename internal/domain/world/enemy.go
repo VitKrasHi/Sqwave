@@ -6,6 +6,7 @@ type EnemyType int
 
 const (
 	EnemyInfantry EnemyType = iota
+	EnemyShooter
 )
 
 type EnemyStats struct {
@@ -15,10 +16,17 @@ type EnemyStats struct {
 	Damage int
 	Size   float64
 
-	MeleeRange        float64 // дистанция, с которой враг бьёт
-	AttackCooldownMin int     // минимум тиков между ударами
-	AttackCooldownMax int     // максимум
-	SwingDuration     int     // длительность замаха
+	MeleeRange        float64
+	AttackCooldownMin int
+	AttackCooldownMax int
+	SwingDuration     int
+
+	// Для стрелка.
+	PreferredMin    float64
+	PreferredMax    float64
+	ProjectileSpeed float64
+	ProjectileSize  float64
+	ProjectileLife  int
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -32,6 +40,21 @@ var enemyStats = map[EnemyType]EnemyStats{
 		AttackCooldownMin: 24, // 400 мс
 		AttackCooldownMax: 60, // 1 сек
 		SwingDuration:     5,
+	},
+	EnemyShooter: {
+		Name:              "Shooter",
+		MaxHP:             100,
+		SP:                80,
+		Damage:            25,
+		Size:              22,
+		MeleeRange:        0,
+		AttackCooldownMin: 90,
+		AttackCooldownMax: 150,
+		PreferredMin:      180,
+		PreferredMax:      340,
+		ProjectileSpeed:   25, // было 4 — почти вдвое быстрее
+		ProjectileSize:    8,
+		ProjectileLife:    90, // было 150 — короче, чтобы не летели через пол-карты
 	},
 }
 
@@ -72,6 +95,13 @@ type Enemy struct {
 	StuckTicks   int
 
 	ForcePathTimer int // если > 0 — игнорировать direct и идти только по A*
+
+	// PrevPlayerDist — расстояние до игрока на прошлом тике.
+	// Нужно стрелку, чтобы понимать, с какой скоростью игрок приближается.
+	PrevPlayerDist float64
+	// Кеш найденной позиции для стрельбы из-за укрытия.
+	ShootPosX, ShootPosY float64
+	ShootPosTimer        int
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {

@@ -21,10 +21,22 @@ const (
 	DashDuration = 8
 	DashCooldown = 40
 
-	EnemyBaseSpeed  = 1.5
-	EnemySpeedPerSP = 0.02
+	EnemyBaseSpeed  = 1.0
+	EnemySpeedPerSP = 0.01
 
 	NavCellSize     = 24.0
 	AgentClearance  = 4.0 // запас вокруг тела при сглаживании пути
 	AgentPredictPad = 2.0 // запас при решении «идти напрямую»
+
+	// Поведение стрелка.
+	ShooterFastApproach    = 3.5
+	ShooterSlowRetreatDist = 80.0
+	ShooterFastRetreatDist = 140.0
+	ShooterSlowRetreatMul  = 0.5
+	ShooterFastRetreatMul  = 1.4
+
+	// Паника: доля от PreferredMin, ниже которой стрелок начинает отступать.
+	ShooterPanicThreshold = 0.85
+	// Доля, выше которой он бросает стрельбу и сосредотачивается на побеге.
+	ShooterFullPanic = 0.95
 )

@@ -8,15 +8,16 @@ import (
 )
 
 type World struct {
-	Player     Player
-	Enemies    []Enemy
-	Bullets    []Bullet
-	Rockets    []Rocket
-	Explosions []Explosion
-	Walls      []geometry.Rect
-	SpawnZone  geometry.Rect
-	Rng        *rand.Rand
-	NavGrid    *geometry.Grid
+	Player           Player
+	Enemies          []Enemy
+	EnemyProjectiles []EnemyProjectile
+	Bullets          []Bullet
+	Rockets          []Rocket
+	Explosions       []Explosion
+	Walls            []geometry.Rect
+	SpawnZone        geometry.Rect
+	Rng              *rand.Rand
+	NavGrid          *geometry.Grid
 }
 
 func New() *World {
@@ -80,14 +81,20 @@ func defaultWalls() []geometry.Rect {
 }
 
 func defaultEnemies() []Enemy {
-	positions := []struct{ x, y float64 }{
-		{400, 300},
-		{1600, 300},
-		{1000, 1200},
+	type spawn struct {
+		t    EnemyType
+		x, y float64
 	}
-	enemies := make([]Enemy, 0, len(positions))
-	for _, p := range positions {
-		enemies = append(enemies, NewEnemy(EnemyInfantry, p.x, p.y))
+	spawns := []spawn{
+		{EnemyInfantry, 400, 300},
+		{EnemyInfantry, 1600, 300},
+		{EnemyInfantry, 1000, 1200},
+		{EnemyShooter, 300, 1200},
+		{EnemyShooter, 1700, 1100},
+	}
+	enemies := make([]Enemy, 0, len(spawns))
+	for _, s := range spawns {
+		enemies = append(enemies, NewEnemy(s.t, s.x, s.y))
 	}
 	return enemies
 }
