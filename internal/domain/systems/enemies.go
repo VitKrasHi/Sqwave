@@ -7,7 +7,39 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
+// maxAStarPerTick — сколько врагов за тик могут пересчитать путь.
+// Остальные ждут следующего тика. Ограничивает нагрузку при толпах.
+const maxAStarPerTick = 4
+
 func StepEnemies(w *world.World) {
+	// 1. Пересобрать spatial hash.
+	if w.SpatialHash != nil {
+		w.SpatialHash.Clear()
+		for i := range w.Enemies {
+			e := &w.Enemies[i]
+			if e.IsDead() {
+				continue
+			}
+			ecx, ecy := e.Center()
+			w.SpatialHash.Insert(i, ecx, ecy)
+		}
+	}
+
+	// 2. Карта занятости для A* (клетки с врагами).
+	if w.EnemyOccupancy != nil {
+		for i := range w.EnemyOccupancy {
+			w.EnemyOccupancy[i] = false
+		}
+		for i := range w.Enemies {
+			e := &w.Enemies[i]
+			if e.IsDead() {
+				continue
+			}
+			size := e.Type.Stats().Size + 8
+			markOccupied(w.NavGrid, w.EnemyOccupancy, e.Rect(), size)
+		}
+	}
+
 	p := &w.Player
 
 	for i := range w.Enemies {
@@ -18,7 +50,6 @@ func StepEnemies(w *world.World) {
 
 		depenetrate(w, e)
 
-		// Регистрируем попадание: HP упало с прошлого тика.
 		if e.HP < e.LastHP {
 			e.RecentlyHitTimer = 60
 		}
@@ -27,7 +58,6 @@ func StepEnemies(w *world.World) {
 			e.RecentlyHitTimer--
 		}
 
-		// Отбрасывание — приоритет над ИИ.
 		if e.KnockbackTimer > 0 {
 			moveEnemyX(w, e, e.KnockbackVX)
 			moveEnemyY(w, e, e.KnockbackVY)
@@ -49,7 +79,6 @@ func StepEnemies(w *world.World) {
 			e.FacingY = dy / dist
 		}
 
-		// Единый трекер застревания.
 		moved := math.Hypot(e.X-e.LastX, e.Y-e.LastY)
 		if moved < 0.4 {
 			e.StuckTicks++
@@ -68,6 +97,12 @@ func StepEnemies(w *world.World) {
 		}
 	}
 
+	// 3. Расталкивание — после всех движений к цели.
+	// Враги уже сдвинулись к игроку; теперь мягко разводим тех,
+	// кто наложился.
+	applySeparation(w)
+
+	// 4. Удаление мёртвых.
 	alive := w.Enemies[:0]
 	for _, e := range w.Enemies {
 		if !e.IsDead() {
@@ -77,26 +112,24 @@ func StepEnemies(w *world.World) {
 	w.Enemies = alive
 }
 
-// ---------- Общие утилиты ----------
+// ==================== Общие утилиты ====================
 
 func hasLineOfSight(w *world.World, x1, y1, x2, y2 float64) bool {
 	for _, wall := range w.Walls {
-		if _, ok := geometry.RaySegmentIntersectsRect(x1, y1, x2, y2, wall); ok {
+		if _, ok := geometry.RaySegmentIntersectsRectRaw(x1, y1, x2, y2,
+			wall.X, wall.Y, wall.W, wall.H); ok {
 			return false
 		}
 	}
 	return true
 }
 
+// hasClearance — линия с запасом pad с каждой стороны не пересекает
+// ни одну стену. Без аллокаций Rect.
 func hasClearance(w *world.World, x1, y1, x2, y2, pad float64) bool {
 	for _, wall := range w.Walls {
-		expanded := geometry.Rect{
-			X: wall.X - pad,
-			Y: wall.Y - pad,
-			W: wall.W + pad*2,
-			H: wall.H + pad*2,
-		}
-		if _, ok := geometry.RaySegmentIntersectsRect(x1, y1, x2, y2, expanded); ok {
+		if _, ok := geometry.RaySegmentIntersectsRectRaw(x1, y1, x2, y2,
+			wall.X-pad, wall.Y-pad, wall.W+pad*2, wall.H+pad*2); ok {
 			return false
 		}
 	}
@@ -129,6 +162,8 @@ func moveEnemyViaPath(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64
 
 	bodyHalf := e.Type.Stats().Size / 2
 
+	// Если игрок снова виден напрямую — сбрасываем путь,
+	// со следующего тика пойдём direct.
 	if hasClearance(w, ecx, ecy, pcx, pcy, bodyHalf+world.AgentPredictPad) {
 		e.Path = nil
 		e.PathIndex = 0
@@ -136,78 +171,115 @@ func moveEnemyViaPath(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64
 		return
 	}
 
+	// Если cooldown ещё тикает — не строим путь, просто идём
+	// по уже проложенному. Это ключевая защита от повторных A*.
+	if e.PathCooldown > 0 {
+		e.PathCooldown--
+		if len(e.Path) > 0 && e.PathIndex < len(e.Path) {
+			target := e.Path[e.PathIndex]
+			dx := target.X - ecx
+			dy := target.Y - ecy
+			l := math.Hypot(dx, dy)
+			if l > 0.5 {
+				dx /= l
+				dy /= l
+				speed := e.Speed()
+				moveEnemyX(w, e, dx*speed)
+				moveEnemyY(w, e, dy*speed)
+			}
+		}
+		return
+	}
+
+	// --- Построение нового пути ---
+
 	goalCellX, goalCellY := grid.WorldToCell(pcx, pcy)
-	if gx, gy, ok := grid.NearestFree(goalCellX, goalCellY, 2); ok {
+	if gx, gy, ok := grid.NearestFree(goalCellX, goalCellY, 3); ok {
 		goalCellX, goalCellY = gx, gy
 	} else {
 		return
 	}
 
-	goalCell := [2]int{goalCellX, goalCellY}
-	needRecompute := len(e.Path) == 0 ||
-		e.PathIndex >= len(e.Path) ||
-		e.PathCooldown <= 0 ||
-		e.PathGoalCell != goalCell
-
-	if needRecompute {
-		startCellX, startCellY := grid.WorldToCell(ecx, ecy)
-		if sx, sy, ok := grid.NearestFree(startCellX, startCellY, 2); ok {
-			startCellX, startCellY = sx, sy
-		} else {
-			return
-		}
-
-		cells := grid.FindPath(startCellX, startCellY, goalCellX, goalCellY)
-		if cells == nil {
-			e.Path = nil
-			e.PathIndex = 0
-			e.PathCooldown = 30
-			e.PathGoalCell = [2]int{-1, -1}
-			return
-		}
-
-		pad := bodyHalf + world.AgentClearance
-		e.Path = e.Path[:0]
-		cursorX, cursorY := ecx, ecy
-		for i := 0; i < len(cells); i++ {
-			best := i
-			for j := i + 1; j < len(cells); j++ {
-				jx, jy := grid.CellCenter(cells[j][0], cells[j][1])
-				if !hasClearance(w, cursorX, cursorY, jx, jy, pad) {
-					break
-				}
-				best = j
-			}
-			bx, by := grid.CellCenter(cells[best][0], cells[best][1])
-			e.Path = append(e.Path, geometry.Point{X: bx, Y: by})
-			cursorX, cursorY = bx, by
-			i = best
-		}
-
-		e.PathIndex = 0
-		e.PathGoalCell = goalCell
-		e.PathCooldown = 15
+	startCellX, startCellY := grid.WorldToCell(ecx, ecy)
+	if sx, sy, ok := grid.NearestFree(startCellX, startCellY, 3); ok {
+		startCellX, startCellY = sx, sy
+	} else {
+		return
 	}
+
+	cells := grid.FindPathAvoid(startCellX, startCellY, goalCellX, goalCellY, w.EnemyOccupancy)
+	if cells == nil {
+		// Fallback без учёта врагов — иначе в толпе никто не
+		// найдёт путь и все замрут.
+		cells = grid.FindPath(startCellX, startCellY, goalCellX, goalCellY)
+	}
+	if cells == nil {
+		// Пути нет вообще. Долгий cooldown, чтобы не долбить A*
+		// каждый тик. StuckTicks сам переключит на direct,
+		// если совсем плохо.
+		e.Path = nil
+		e.PathIndex = 0
+		e.PathCooldown = 60 + w.Rng.Intn(31)
+		e.PathGoalCell = [2]int{-1, -1}
+		return
+	}
+
+	// Сглаживание с ограниченным lookahead: проверяем не больше
+	// 8 waypoint'ов вперёд, а не весь путь. Без этого O(N²)
+	// на длинных путях убивает производительность.
+	pad := bodyHalf + world.AgentClearance
+	const maxLookahead = 8
+
+	e.Path = e.Path[:0]
+	cursorX, cursorY := ecx, ecy
+	for i := 0; i < len(cells); i++ {
+		best := i
+		limit := i + maxLookahead
+		if limit >= len(cells) {
+			limit = len(cells) - 1
+		}
+		for j := i + 1; j <= limit; j++ {
+			jx, jy := grid.CellCenter(cells[j][0], cells[j][1])
+			if !hasClearance(w, cursorX, cursorY, jx, jy, pad) {
+				break
+			}
+			best = j
+		}
+		bx, by := grid.CellCenter(cells[best][0], cells[best][1])
+		e.Path = append(e.Path, geometry.Point{X: bx, Y: by})
+		cursorX, cursorY = bx, by
+		i = best
+	}
+
+	e.PathIndex = 0
+	e.PathGoalCell = [2]int{goalCellX, goalCellY}
+	e.PathCooldown = 30 + w.Rng.Intn(31) // 0.5..1 сек до следующего пересчёта
 
 	if len(e.Path) == 0 {
 		return
 	}
 
-	for e.PathIndex < len(e.Path) {
-		target := e.Path[e.PathIndex]
-		if hasClearance(w, ecx, ecy, target.X, target.Y, bodyHalf) {
-			break
+	// --- Движение к первому waypoint ---
+
+	// Если до первого waypoint нет clearance — идём к нему
+	// «вслепую». Физика сама остановит, если упрёмся в стену,
+	// но враг хотя бы сдвинется из мёртвой точки.
+	target := e.Path[e.PathIndex]
+	if !hasClearance(w, ecx, ecy, target.X, target.Y, bodyHalf) {
+		dx := target.X - ecx
+		dy := target.Y - ecy
+		l := math.Hypot(dx, dy)
+		if l > 0.5 {
+			dx /= l
+			dy /= l
+			speed := e.Speed()
+			moveEnemyX(w, e, dx*speed)
+			moveEnemyY(w, e, dy*speed)
 		}
-		e.PathIndex++
-	}
-	if e.PathIndex >= len(e.Path) {
-		e.Path = nil
-		e.PathIndex = 0
-		e.PathCooldown = 0
 		return
 	}
 
-	target := e.Path[e.PathIndex]
+	// Стандартное движение к waypoint'у.
 	tcx, tcy := grid.WorldToCell(target.X, target.Y)
 	mcx, mcy := grid.WorldToCell(ecx, ecy)
 	if tcx == mcx && tcy == mcy {
@@ -232,6 +304,8 @@ func moveEnemyViaPath(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64
 	moveEnemyY(w, e, dy*speed)
 }
 
+// moveEnemyX — движение по X с коллизиями ТОЛЬКО против стен.
+// Другие враги игнорируются — их разведёт applySeparation.
 func moveEnemyX(w *world.World, e *world.Enemy, dx float64) bool {
 	if dx == 0 {
 		return false
@@ -257,34 +331,6 @@ func moveEnemyX(w *world.World, e *world.Enemy, dx float64) bool {
 				continue
 			}
 			if limit := wall.X + wall.W; limit > targetX {
-				targetX = limit
-				blocked = true
-			}
-		}
-	}
-
-	for i := range w.Enemies {
-		other := &w.Enemies[i]
-		if other == e {
-			continue
-		}
-		otherSize := other.Type.Stats().Size
-		if e.Y >= other.Y+otherSize || e.Y+size <= other.Y {
-			continue
-		}
-		if dx > 0 {
-			if other.X < e.X+size {
-				continue
-			}
-			if limit := other.X - size; limit < targetX {
-				targetX = limit
-				blocked = true
-			}
-		} else {
-			if other.X+otherSize > e.X {
-				continue
-			}
-			if limit := other.X + otherSize; limit > targetX {
 				targetX = limit
 				blocked = true
 			}
@@ -334,34 +380,6 @@ func moveEnemyY(w *world.World, e *world.Enemy, dy float64) bool {
 		}
 	}
 
-	for i := range w.Enemies {
-		other := &w.Enemies[i]
-		if other == e {
-			continue
-		}
-		otherSize := other.Type.Stats().Size
-		if e.X >= other.X+otherSize || e.X+size <= other.X {
-			continue
-		}
-		if dy > 0 {
-			if other.Y < e.Y+size {
-				continue
-			}
-			if limit := other.Y - size; limit < targetY {
-				targetY = limit
-				blocked = true
-			}
-		} else {
-			if other.Y+otherSize > e.Y {
-				continue
-			}
-			if limit := other.Y + otherSize; limit > targetY {
-				targetY = limit
-				blocked = true
-			}
-		}
-	}
-
 	if targetY < 0 {
 		targetY = 0
 		blocked = true
@@ -374,6 +392,7 @@ func moveEnemyY(w *world.World, e *world.Enemy, dy float64) bool {
 	return blocked
 }
 
+// depenetrate выталкивает врага из стен по кратчайшей оси.
 func depenetrate(w *world.World, e *world.Enemy) {
 	size := e.Type.Stats().Size
 
@@ -433,5 +452,97 @@ func depenetrate(w *world.World, e *world.Enemy) {
 	}
 	if e.Y+size > world.WorldHeight {
 		e.Y = world.WorldHeight - size
+	}
+}
+
+// pushOutOfCorner — короткий импульс от ближайшей стены.
+// Используется, когда враг застрял в углу и никакой путь
+// не может его сдвинуть.
+func pushOutOfCorner(w *world.World, e *world.Enemy) {
+	size := e.Type.Stats().Size
+	ecx, ecy := e.Center()
+
+	// Ищем ближайшую стену, которая пересекается с хитбоксом,
+	// расширенным на 4 пикселя (то есть враг почти касается).
+	var nearWall *geometry.Rect
+	nearDist := math.Inf(1)
+
+	for i := range w.Walls {
+		wall := &w.Walls[i]
+		expanded := geometry.Rect{
+			X: wall.X - 4,
+			Y: wall.Y - 4,
+			W: wall.W + 8,
+			H: wall.H + 8,
+		}
+		if !expanded.Intersects(e.Rect()) {
+			continue
+		}
+		wcx := wall.X + wall.W/2
+		wcy := wall.Y + wall.H/2
+		d := math.Hypot(wcx-ecx, wcy-ecy)
+		if d < nearDist {
+			nearDist = d
+			nearWall = wall
+		}
+	}
+
+	if nearWall == nil {
+		return
+	}
+
+	// Вектор от центра стены к центру врага — куда толкать.
+	dx := ecx - (nearWall.X + nearWall.W/2)
+	dy := ecy - (nearWall.Y + nearWall.H/2)
+	l := math.Hypot(dx, dy)
+	if l < 0.01 {
+		// Враг ровно в центре стены — это баг, выбираем
+		// случайное направление.
+		angle := w.Rng.Float64() * math.Pi * 2
+		dx = math.Cos(angle)
+		dy = math.Sin(angle)
+	} else {
+		dx /= l
+		dy /= l
+	}
+
+	// Импульс на 4 тика.
+	force := e.Speed() * 2.0
+	moveEnemyX(w, e, dx*force)
+	moveEnemyY(w, e, dy*force)
+
+	// Заодно сбрасываем path, чтобы пересчитался из новой позиции.
+	e.Path = nil
+	e.PathIndex = 0
+	e.PathCooldown = 0
+	_ = size
+}
+
+// markOccupied помечает в карте занятости клетки, которые
+// перекрываются с прямоугольником r, расширенным на размер агента.
+// Реализация совпадает с MarkRectForAgent, но пишет в отдельный срез.
+func markOccupied(g *geometry.Grid, occ []bool, r geometry.Rect, agentSize float64) {
+	half := agentSize / 2
+	x0 := int((r.X - half) / g.CellSize)
+	y0 := int((r.Y - half) / g.CellSize)
+	x1 := int((r.X + r.W + half) / g.CellSize)
+	y1 := int((r.Y + r.H + half) / g.CellSize)
+
+	for cy := y0; cy <= y1; cy++ {
+		for cx := x0; cx <= x1; cx++ {
+			if !g.InBounds(cx, cy) {
+				continue
+			}
+			centerX, centerY := g.CellCenter(cx, cy)
+			agent := geometry.Rect{
+				X: centerX - half,
+				Y: centerY - half,
+				W: agentSize,
+				H: agentSize,
+			}
+			if agent.Intersects(r) {
+				occ[cy*g.Cols+cx] = true
+			}
+		}
 	}
 }

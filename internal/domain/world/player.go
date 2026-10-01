@@ -26,7 +26,14 @@ type Player struct {
 	// AimX, AimY — мировая точка прицела. Обновляется каждый тик.
 	AimX, AimY float64
 
-	// IsFiring — удерживается ли ЛКМ.
+	// Скорость прицела — модуль перемещения AimX/AimY за тик.
+	// Нужна разведчику, чтобы понимать: игрок резко ведёт или плавно.
+	AimPlayerSpeed float64
+
+	// Предыдущий прицел — для расчёта AimSpeed.
+	PrevAimX, PrevAimY float64
+	HasPrevAim         bool
+
 	IsFiring bool
 }
 

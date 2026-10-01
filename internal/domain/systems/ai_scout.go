@@ -6,8 +6,6 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
-// stepScout: разведчик — быстрый, агрессивный вблизи, уклоняется
-// от прицела игрока, после попадания убегает и стреляет через спину.
 func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
 
@@ -18,6 +16,9 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	if e.DodgeTimer > 0 {
 		e.DodgeTimer--
 	}
+	if e.DodgePause > 0 {
+		e.DodgePause--
+	}
 
 	// После попадания — побег.
 	if e.RecentlyHitTimer > 0 {
@@ -25,13 +26,14 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 		return
 	}
 
-	// Застряли — сбрасываем уклонение и идём через A*.
-	if e.StuckTicks > 5 {
+	// Застряли — сбрасываем серию и идём через A*.
+	if e.StuckTicks > 10 && e.PathCooldown == 0 {
 		e.DodgeTimer = 0
+		e.DodgeQueue = 0
 		e.DodgeCooldown = 0
 		e.Path = nil
 		e.PathIndex = 0
-		e.PathCooldown = 0
+		e.StuckTicks = 0
 		moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
 		return
 	}
@@ -57,7 +59,7 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	baseX := toPlayerX / toPlayerLen
 	baseY := toPlayerY / toPlayerLen
 
-	// Лёгкий диагональный дрейф — небольшая добавка к движению вперёд.
+	// Лёгкий дрейф.
 	drift := math.Sin(float64(e.AITimer)*0.08) * 0.3
 	perpX := -baseY
 	perpY := baseX
@@ -68,42 +70,64 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	// --- Активное уклонение ---
 	speedMult := 1.0
 	if e.DodgeTimer > 0 {
-		moveX += e.DodgeDirX * 1.5
-		moveY += e.DodgeDirY * 1.5
+		// Рывок: сильная боковая компонента, движение к игроку
+		// сохраняется. Отношение примерно 2:1 в пользу бокового.
+		moveX += e.DodgeDirX * 2.0
+		moveY += e.DodgeDirY * 2.0
 		speedMult = 1.8
-	} else if e.DodgeCooldown == 0 {
-		if dirX, dirY, ok := dodgeFromAim(w, e, ecx, ecy, pcx, pcy); ok {
-			// Проверяем, что в сторону уклонения есть свободное место.
-			lookAhead := e.Type.Stats().Size + 20
-			checkX := ecx + dirX*lookAhead
-			checkY := ecy + dirY*lookAhead
-			if !hasClearance(w, ecx, ecy, checkX, checkY, e.Type.Stats().Size/2) {
-				// Там стена — уклоняемся в противоположную сторону.
-				dirX, dirY = -dirX, -dirY
-				checkX = ecx + dirX*lookAhead
-				checkY = ecy + dirY*lookAhead
-				if !hasClearance(w, ecx, ecy, checkX, checkY, e.Type.Stats().Size/2) {
-					// И там стена — не уклоняемся, идём к игроку.
-					e.DodgeCooldown = 15
-				}
-			}
-			if e.DodgeCooldown == 0 {
-				dot := dirX*baseX + dirY*baseY
-				if dot < 0.3 {
-					dirX = dirX*0.6 + baseX*0.4
-					dirY = dirY*0.6 + baseY*0.4
-					l := math.Hypot(dirX, dirY)
-					if l > 0.01 {
-						dirX /= l
-						dirY /= l
-					}
-				}
-				e.DodgeTimer = 10 + w.Rng.Intn(11) // 10..20 тиков
-				e.DodgeDirX = dirX
-				e.DodgeDirY = dirY
-				e.DodgeCooldown = 25 + w.Rng.Intn(15) // 0.4..0.7 сек
-			}
+
+	} else if e.DodgeQueue > 0 && e.DodgePause == 0 {
+		// Серия ещё не кончилась и пауза между рывками прошла.
+		// Генерируем следующий рывок.
+		dirX, dirY := randomDodgeDirection(w, e, baseX, baseY)
+		e.DodgeDirX = dirX
+		e.DodgeDirY = dirY
+		// Длительность рывка: чередуем короткие и длинные.
+		// 5..8 — короткий, 12..20 — длинный.
+		if w.Rng.Intn(2) == 0 {
+			e.DodgeTimer = 5 + w.Rng.Intn(4) // короткий
+		} else {
+			e.DodgeTimer = 12 + w.Rng.Intn(9) // длинный
 		}
+		e.DodgeQueue--
+		speedMult = 1.8
+
+	} else if e.DodgeCooldown == 0 {
+		// Проверяем угрозы: резкое движение прицела или точное наведение.
+		urgency, queued := detectAimThreat(w, e, ecx, ecy, pcx, pcy)
+
+		if urgency {
+			// Серия из 2–3 рывков.
+			e.DodgeQueue = 2 + w.Rng.Intn(2)
+			e.DodgeCooldown = 40 + w.Rng.Intn(20)
+			// Первый рывок начнётся со следующего тика.
+			// Сразу сгенерируем его параметры.
+			dirX, dirY := randomDodgeDirection(w, e, baseX, baseY)
+			e.DodgeDirX = dirX
+			e.DodgeDirY = dirY
+			if w.Rng.Intn(2) == 0 {
+				e.DodgeTimer = 5 + w.Rng.Intn(4)
+			} else {
+				e.DodgeTimer = 12 + w.Rng.Intn(9)
+			}
+			e.DodgeQueue--
+			speedMult = 1.8
+		} else if queued {
+			// Прицел очень близко, но игрок не двигает резко.
+			// Одиночный короткий рывок.
+			dirX, dirY := randomDodgeDirection(w, e, baseX, baseY)
+			e.DodgeDirX = dirX
+			e.DodgeDirY = dirY
+			e.DodgeTimer = 6 + w.Rng.Intn(5)
+			e.DodgeCooldown = 25 + w.Rng.Intn(15)
+			speedMult = 1.8
+		}
+	}
+
+	// После окончания рывка в серии — небольшая пауза,
+	// чтобы рывки не сливались в один непрерывный.
+	if e.DodgeTimer == 0 && e.DodgeQueue > 0 && e.DodgePause == 0 {
+		e.DodgePause = 3
 	}
 
 	// Нормализуем итоговый вектор.
@@ -124,16 +148,17 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
 }
 
-// dodgeFromAim — если линия прицела игрока проходит близко
-// к разведчику, вернуть перпендикулярное направление уклонения.
-func dodgeFromAim(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64) (float64, float64, bool) {
+// detectAimThreat проверяет два источника угрозы:
+//  1. Игрок резко двинул прицелом — срочное уклонение (urgency=true).
+//  2. Прицел точно наведён на скаута — одиночный рывок (queued=true).
+func detectAimThreat(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64) (bool, bool) {
 	p := &w.Player
 
 	aimDX := p.AimX - pcx
 	aimDY := p.AimY - pcy
 	aimLen := math.Hypot(aimDX, aimDY)
 	if aimLen < 1 {
-		return 0, 0, false
+		return false, false
 	}
 	aimX := aimDX / aimLen
 	aimY := aimDY / aimLen
@@ -141,43 +166,64 @@ func dodgeFromAim(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64) (f
 	toScoutX := ecx - pcx
 	toScoutY := ecy - pcy
 
-	// Проекция на линию прицела: если разведчик позади игрока,
-	// он не в опасной зоне.
 	proj := toScoutX*aimX + toScoutY*aimY
 	if proj < 40 {
-		return 0, 0, false
+		return false, false
 	}
 
 	perpX := -aimY
 	perpY := aimX
 	perpDist := toScoutX*perpX + toScoutY*perpY
 
-	// Порог: чем ближе к линии прицела, тем срочнее уклонение.
-	// Если игрок жмёт ЛКМ — порог шире (он явно целится).
-	threshold := 28.0
-	if p.IsFiring {
-		threshold = 42.0
-	}
-	if math.Abs(perpDist) > threshold {
-		return 0, 0, false
+	// 1. Резкое движение прицела при любой близости к лучу.
+	// Чем ближе линия прицела — тем критичнее.
+	distToLine := math.Abs(perpDist)
+	if p.AimPlayerSpeed > world.ScoutAimSpeedPanic && distToLine < 60 {
+		return true, false
 	}
 
-	// Сторона уклонения: туда, куда разведчик уже отклонён.
-	// Если он ровно на линии — берём случайную.
-	side := 1.0
-	if perpDist > 0.5 {
-		side = 1
-	} else if perpDist < -0.5 {
-		side = -1
-	} else if w.Rng.Float64() < 0.5 {
-		side = -1
+	// 2. Точное наведение: прицел стоит близко к скауту, игрок
+	// двигает его медленно, но стреляет или готов стрелять.
+	if distToLine < world.ScoutPreciseRadius {
+		precise := p.AimPlayerSpeed < world.ScoutPreciseSpeed
+		if precise && p.IsFiring {
+			return false, true
+		}
 	}
 
-	return perpX * side, perpY * side, true
+	return false, false
 }
 
-// scoutFlee — режим побега после попадания: движение от игрока
-// с зигзагом и редкими выстрелами через спину.
+// randomDodgeDirection — рывок в сторону, но никогда не от игрока.
+// Угол выбирается случайно в диапазоне ±70° от направления на игрока.
+func randomDodgeDirection(w *world.World, e *world.Enemy, baseX, baseY float64) (float64, float64) {
+	// Случайный угол от -70° до +70° от направления к игроку.
+	maxAngle := 70 * math.Pi / 180
+	angle := (w.Rng.Float64()*2 - 1) * maxAngle
+
+	cos := math.Cos(angle)
+	sin := math.Sin(angle)
+
+	// Поворачиваем базовый вектор на этот угол.
+	dx := baseX*cos - baseY*sin
+	dy := baseX*sin + baseY*cos
+
+	// Гарантия: всегда есть положительная компонента к игроку.
+	// Если из-за округлений получилось перпендикулярно — доворачиваем.
+	dot := dx*baseX + dy*baseY
+	if dot < 0.15 {
+		// Смешиваем с base, чтобы вернуть движение вперёд.
+		dx = dx*0.5 + baseX*0.5
+		dy = dy*0.5 + baseY*0.5
+		l := math.Hypot(dx, dy)
+		if l > 0.01 {
+			dx /= l
+			dy /= l
+		}
+	}
+	return dx, dy
+}
+
 func scoutFlee(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
 
@@ -202,7 +248,6 @@ func scoutFlee(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 		dirY /= l
 	}
 
-	// Стреляем через спину, пока есть видимость и дистанция разумная.
 	if e.AttackTimer == 0 && dist < 300 && hasLineOfSight(w, ecx, ecy, pcx, pcy) {
 		fireEnemyProjectile(w, e, ecx, ecy, pcx, pcy)
 		span := stats.AttackCooldownMax - stats.AttackCooldownMin

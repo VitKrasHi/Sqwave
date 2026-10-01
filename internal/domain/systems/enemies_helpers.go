@@ -34,8 +34,8 @@ func moveEnemyToPointDirect(w *world.World, e *world.Enemy, ecx, ecy, tx, ty, sp
 
 // moveEnemyToPoint — движение к произвольной точке через A*.
 func moveEnemyToPoint(w *world.World, e *world.Enemy, ecx, ecy, tx, ty float64) {
-	grid := w.NavGrid
-	if grid == nil {
+	baseGrid := w.NavGrid
+	if baseGrid == nil {
 		return
 	}
 
@@ -44,8 +44,10 @@ func moveEnemyToPoint(w *world.World, e *world.Enemy, ecx, ecy, tx, ty float64) 
 		return
 	}
 
+	grid := gridWithAgents(baseGrid, w.Enemies, e, e.Type.Stats().Size)
+
 	goalCellX, goalCellY := grid.WorldToCell(tx, ty)
-	if gx, gy, ok := grid.NearestFree(goalCellX, goalCellY, 2); ok {
+	if gx, gy, ok := grid.NearestFree(goalCellX, goalCellY, 3); ok {
 		goalCellX, goalCellY = gx, gy
 	} else {
 		return
@@ -59,13 +61,16 @@ func moveEnemyToPoint(w *world.World, e *world.Enemy, ecx, ecy, tx, ty float64) 
 
 	if needRecompute {
 		startCellX, startCellY := grid.WorldToCell(ecx, ecy)
-		if sx, sy, ok := grid.NearestFree(startCellX, startCellY, 2); ok {
+		if sx, sy, ok := grid.NearestFree(startCellX, startCellY, 3); ok {
 			startCellX, startCellY = sx, sy
 		} else {
 			return
 		}
 
-		cells := grid.FindPath(startCellX, startCellY, goalCellX, goalCellY)
+		cells := grid.FindPathAvoid(startCellX, startCellY, goalCellX, goalCellY, w.EnemyOccupancy)
+		if cells == nil {
+			cells = grid.FindPath(startCellX, startCellY, goalCellX, goalCellY)
+		}
 		if cells == nil {
 			e.Path = nil
 			e.PathIndex = 0
@@ -265,4 +270,36 @@ func losToRectWithPad(w *world.World, fromX, fromY float64, r geometry.Rect, pad
 		}
 	}
 	return 0, 0, false
+}
+
+// gridWithAgents возвращает копию nav-сетки, где клетки,
+// занятые другими врагами, помечены как blocked. Это заставляет
+// A* прокладывать путь в обход союзников, а не сквозь них.
+// skip — сам агент, для которого строим путь; base-сетка не мутируется.
+func gridWithAgents(base *geometry.Grid, enemies []world.Enemy, skip *world.Enemy, agentSize float64) *geometry.Grid {
+	if base == nil {
+		return nil
+	}
+
+	copyGrid := &geometry.Grid{
+		CellSize: base.CellSize,
+		Cols:     base.Cols,
+		Rows:     base.Rows,
+		Blocked:  make([]bool, len(base.Blocked)),
+	}
+	copy(copyGrid.Blocked, base.Blocked)
+
+	for i := range enemies {
+		e := &enemies[i]
+		if e == skip {
+			continue
+		}
+		if e.IsDead() {
+			continue
+		}
+		// Помечаем клетки вокруг врага с запасом в размер агента,
+		// чтобы пути не шли впритык к союзникам.
+		copyGrid.MarkRectForAgent(e.Rect(), agentSize)
+	}
+	return copyGrid
 }

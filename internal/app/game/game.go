@@ -9,6 +9,9 @@ import (
 	"Sqwave/internal/domain/input"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 const aimLineLength = 90.0
@@ -21,6 +24,8 @@ type Game struct {
 
 	lastInput input.PlayerInput
 	ticks     int // для анимаций представления
+
+	debugNav bool
 }
 
 func New(w *world.World, in InputSource) *Game {
@@ -40,6 +45,10 @@ func New(w *world.World, in InputSource) *Game {
 
 func (g *Game) Update() error {
 	g.ticks++
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
+		g.debugNav = !g.debugNav
+	}
 
 	in := g.input.Poll()
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
@@ -70,9 +79,15 @@ func (g *Game) Update() error {
 	systems.StepBullets(g.world)
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
-	systems.StepEnemies(g.world)
+	systems.StepWaves(g.world)
 	systems.StepEnemies(g.world)
 	systems.StepEnemyProjectiles(g.world)
+	systems.StepEnemyProjectiles(g.world)
+
+	if !g.menu.Open {
+		systems.StepWaves(g.world)
+	}
+	systems.StepEnemies(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -129,6 +144,10 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
 	}
 
+	if g.debugNav {
+		drawNavDebug(r, w)
+	}
+
 	drawEnemies(r, w)
 
 	p := &w.Player
@@ -172,6 +191,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	drawHPBar(r, p.CurrentHP(), p.MaxHP())
+	drawWavePanel(r, w)
 
 	if g.menu.Open {
 		drawMenu(r, &g.menu, p)
@@ -441,4 +461,41 @@ func drawEnemySwing(r SceneRenderer, e *world.Enemy) {
 	endX := cx + math.Cos(angle)*stats.MeleeRange
 	endY := cy + math.Sin(angle)*stats.MeleeRange
 	r.DrawLine(cx, cy, endX, endY, 4, ColorEnemySword)
+}
+
+func drawNavDebug(r SceneRenderer, w *world.World) {
+	if w.NavGrid == nil {
+		return
+	}
+	cs := w.NavGrid.CellSize
+
+	// Заблокированные клетки.
+	for cy := 0; cy < w.NavGrid.Rows; cy++ {
+		for cx := 0; cx < w.NavGrid.Cols; cx++ {
+			if !w.NavGrid.Blocked[cy*w.NavGrid.Cols+cx] {
+				continue
+			}
+			r.DrawWorldCell(float64(cx)*cs, float64(cy)*cs, cs, ColorNavGridBlocked)
+		}
+	}
+
+	// Пути врагов.
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if len(e.Path) == 0 {
+			continue
+		}
+		ecx, ecy := e.Center()
+		prevX, prevY := ecx, ecy
+		for j := e.PathIndex; j < len(e.Path); j++ {
+			wp := e.Path[j]
+			r.DrawLine(prevX, prevY, wp.X, wp.Y, 2, ColorNavPath)
+			prevX, prevY = wp.X, wp.Y
+		}
+		// Концы waypoint'ов.
+		for j := e.PathIndex; j < len(e.Path); j++ {
+			wp := e.Path[j]
+			r.DrawRect(wp.X-3, wp.Y-3, 6, 6, ColorNavPathNode)
+		}
+	}
 }

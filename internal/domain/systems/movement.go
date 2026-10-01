@@ -9,6 +9,17 @@ import (
 
 func StepPlayer(w *world.World, in input.PlayerInput) {
 	p := &w.Player
+	if p.HasPrevAim {
+		dx := in.AimX - p.PrevAimX
+		dy := in.AimY - p.PrevAimY
+		p.AimPlayerSpeed = math.Hypot(dx, dy)
+	} else {
+		p.AimPlayerSpeed = 0
+		p.HasPrevAim = true
+	}
+	p.PrevAimX = in.AimX
+	p.PrevAimY = in.AimY
+
 	p.AimX = in.AimX
 	p.AimY = in.AimY
 	p.IsFiring = in.Fire

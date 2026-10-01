@@ -8,34 +8,34 @@ import (
 
 func stepInfantry(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	bodyHalf := stats.Size / 2
 
-	// Фаза замаха.
 	if e.SwingActive {
 		e.SwingTimer++
 		if e.SwingTimer >= stats.SwingDuration {
 			e.SwingActive = false
 
 			ecx, ecy = e.Center()
-			pcx, pcy = w.Player.Center() // ← было p.Center()
+			pcx, pcy = w.Player.Center()
 			dist = math.Hypot(pcx-ecx, pcy-ecy)
 
-			if dist <= stats.MeleeRange && hasClearance(w, ecx, ecy, pcx, pcy, bodyHalf) {
+			if dist <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx, pcy) {
 				w.Player.TakeDamage(stats.Damage)
 			}
 
 			span := stats.AttackCooldownMax - stats.AttackCooldownMin
 			e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
 		}
+		return
 	}
 
 	if e.AttackTimer > 0 {
 		e.AttackTimer--
 	}
 
-	directOK := hasClearance(w, ecx, ecy, pcx, pcy, bodyHalf+world.AgentPredictPad)
+	directOK := hasClearance(w, ecx, ecy, pcx, pcy, stats.Size/2+world.AgentPredictPad)
 
-	if dist <= stats.MeleeRange && e.AttackTimer == 0 && directOK {
+	canHit := dist <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx, pcy)
+	if canHit && e.AttackTimer == 0 {
 		e.SwingActive = true
 		e.SwingTimer = 0
 		e.StuckTicks = 0
@@ -50,6 +50,9 @@ func stepInfantry(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float
 	}
 
 	if e.StuckTicks > 20 {
+		// Долго не двигаемся — принудительно толкаем в сторону
+		// от ближайшей стены. Иначе враг будет вечно стоять
+		// в углу, даже если A* построит корректный путь.
 		e.ForcePathTimer = 25
 		e.StuckTicks = 0
 		return
@@ -57,7 +60,7 @@ func stepInfantry(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float
 
 	if directOK {
 		moveEnemyDirect(w, e, ecx, ecy, pcx, pcy)
-	} else {
-		moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
+		return
 	}
+	moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
 }

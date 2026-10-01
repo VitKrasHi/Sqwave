@@ -1,7 +1,6 @@
 package geometry
 
 import (
-	"container/heap"
 	"math"
 )
 
@@ -14,6 +13,13 @@ type Grid struct {
 	Cols     int
 	Rows     int
 	Blocked  []bool
+
+	// Переиспользуемые буферы A*. Инициализируются лениво.
+	astarG      []int32
+	astarParent []int32
+	astarClosed []bool
+	astarHeap   []int32 // индексы клеток, min-heap по f
+	astarF      []int32
 }
 
 func NewGrid(worldW, worldH, cellSize float64) *Grid {
@@ -163,9 +169,17 @@ func heuristic(ax, ay, bx, by int) int {
 	return astarDiagonalCost*dy + astarStraightCost*(dx-dy)
 }
 
-// FindPath ищет кратчайший путь между клетками. Возвращает срез клеток
-// от стартовой (не включена) до целевой (включена), либо nil.
+// FindPath — итеративный A* без аллокаций.
+// Внимание: не потокобезопасен — буферы разделяются между вызовами.
 func (g *Grid) FindPath(sx, sy, tx, ty int) [][2]int {
+	return g.FindPathAvoid(sx, sy, tx, ty, nil)
+}
+
+// FindPathAvoid — то же, что FindPath, но с учётом карты занятости
+// avoid (размер Cols*Rows). Клетки, помеченные в avoid, считаются
+// заблокированными. Стартовая и целевая клетки всегда разрешены —
+// иначе агент, стоящий в занятой клетке, не смог бы стартовать.
+func (g *Grid) FindPathAvoid(sx, sy, tx, ty int, avoid []bool) [][2]int {
 	if g.IsBlocked(sx, sy) || g.IsBlocked(tx, ty) {
 		return nil
 	}
@@ -173,59 +187,121 @@ func (g *Grid) FindPath(sx, sy, tx, ty int) [][2]int {
 		return nil
 	}
 
-	start := &astarNode{x: sx, y: sy, f: heuristic(sx, sy, tx, ty)}
-	open := &astarHeap{start}
-	heap.Init(open)
+	total := g.Cols * g.Rows
+	if avoid != nil && len(avoid) != total {
+		avoid = nil
+	}
+	g.ensureAstarBuffers(total)
 
-	best := map[[2]int]*astarNode{{sx, sy}: start}
+	for i := range g.astarG {
+		g.astarG[i] = -1
+		g.astarClosed[i] = false
+		g.astarParent[i] = -1
+		g.astarF[i] = 0
+	}
+	g.astarHeap = g.astarHeap[:0]
 
-	for open.Len() > 0 {
-		cur := heap.Pop(open).(*astarNode)
-		key := [2]int{cur.x, cur.y}
+	startIdx := sy*g.Cols + sx
+	targetIdx := ty*g.Cols + tx
 
-		// Устаревшая запись: этот узел уже был улучшен.
-		if best[key] != cur {
+	blocked := func(x, y int) bool {
+		if g.IsBlocked(x, y) {
+			return true
+		}
+		idx := y*g.Cols + x
+		if idx == startIdx || idx == targetIdx {
+			return false
+		}
+		return avoid != nil && avoid[idx]
+	}
+
+	g.astarG[startIdx] = 0
+	g.astarF[startIdx] = int32(heuristic(sx, sy, tx, ty))
+	g.astarHeap = append(g.astarHeap, int32(startIdx))
+
+	for len(g.astarHeap) > 0 {
+		best := 0
+		for i := 1; i < len(g.astarHeap); i++ {
+			if g.astarF[g.astarHeap[i]] < g.astarF[g.astarHeap[best]] {
+				best = i
+			}
+		}
+		curIdx := int(g.astarHeap[best])
+		g.astarHeap[best] = g.astarHeap[len(g.astarHeap)-1]
+		g.astarHeap = g.astarHeap[:len(g.astarHeap)-1]
+
+		if curIdx == targetIdx {
+			return g.reconstructAstar(startIdx, targetIdx)
+		}
+		if g.astarClosed[curIdx] {
 			continue
 		}
+		g.astarClosed[curIdx] = true
 
-		if cur.x == tx && cur.y == ty {
-			return reconstructPath(cur)
-		}
+		cx := curIdx % g.Cols
+		cy := curIdx / g.Cols
 
 		for _, d := range astarDirs {
-			nx, ny := cur.x+d[0], cur.y+d[1]
-			if g.IsBlocked(nx, ny) {
+			nx, ny := cx+d[0], cy+d[1]
+			if blocked(nx, ny) {
 				continue
 			}
-			// Запрет «срезать угол» между двумя блокированными
-			// клетками по диагонали: враг физически не пройдёт.
 			if d[0] != 0 && d[1] != 0 {
-				if g.IsBlocked(cur.x+d[0], cur.y) || g.IsBlocked(cur.x, cur.y+d[1]) {
+				if blocked(cx+d[0], cy) || blocked(cx, cy+d[1]) {
 					continue
 				}
+			}
+
+			nIdx := ny*g.Cols + nx
+			if g.astarClosed[nIdx] {
+				continue
 			}
 
 			step := astarStraightCost
 			if d[0] != 0 && d[1] != 0 {
 				step = astarDiagonalCost
 			}
-			ng := cur.g + step
+			ng := g.astarG[curIdx] + int32(step)
 
-			nkey := [2]int{nx, ny}
-			if prev, ok := best[nkey]; ok && prev.g <= ng {
+			if g.astarG[nIdx] != -1 && g.astarG[nIdx] <= ng {
 				continue
 			}
-			n := &astarNode{
-				x: nx, y: ny,
-				g:      ng,
-				f:      ng + heuristic(nx, ny, tx, ty),
-				parent: cur,
-			}
-			best[nkey] = n
-			heap.Push(open, n)
+			g.astarG[nIdx] = ng
+			g.astarParent[nIdx] = int32(curIdx)
+			g.astarF[nIdx] = ng + int32(heuristic(nx, ny, tx, ty))
+			g.astarHeap = append(g.astarHeap, int32(nIdx))
 		}
 	}
 	return nil
+}
+
+func (g *Grid) ensureAstarBuffers(total int) {
+	if cap(g.astarG) < total {
+		g.astarG = make([]int32, total)
+		g.astarParent = make([]int32, total)
+		g.astarClosed = make([]bool, total)
+		g.astarF = make([]int32, total)
+	} else {
+		g.astarG = g.astarG[:total]
+		g.astarParent = g.astarParent[:total]
+		g.astarClosed = g.astarClosed[:total]
+		g.astarF = g.astarF[:total]
+	}
+}
+
+func (g *Grid) reconstructAstar(startIdx, targetIdx int) [][2]int {
+	var rev []int
+	cur := targetIdx
+	for cur != startIdx && cur != -1 {
+		rev = append(rev, cur)
+		cur = int(g.astarParent[cur])
+	}
+	out := make([][2]int, 0, len(rev))
+	for i := len(rev) - 1; i >= 0; i-- {
+		idx := rev[i]
+		out = append(out, [2]int{idx % g.Cols, idx / g.Cols})
+	}
+	return out
 }
 
 func reconstructPath(n *astarNode) [][2]int {

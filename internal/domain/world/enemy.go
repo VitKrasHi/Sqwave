@@ -54,7 +54,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		AttackCooldownMax: 150,
 		PreferredMin:      180,
 		PreferredMax:      340,
-		ProjectileSpeed:   25, // было 4 — почти вдвое быстрее
+		ProjectileSpeed:   8, // было 4 — почти вдвое быстрее
 		ProjectileSize:    8,
 		ProjectileLife:    90, // было 150 — короче, чтобы не летели через пол-карты
 	},
@@ -130,11 +130,17 @@ type Enemy struct {
 	// Множитель скорости (используется разведчиком для рывков).
 	SpeedBurst int
 
-	// Разведчик: короткий рывок-уклонение.
+	// Разведчик: серия рывков при резком/точном наведении.
 	DodgeTimer    int
 	DodgeDirX     float64
 	DodgeDirY     float64
 	DodgeCooldown int
+	DodgeQueue    int // сколько ещё рывков в текущей серии
+	DodgePause    int // пауза между рывками серии
+
+	// Стрелок: движение по орбите вокруг игрока.
+	OrbitDir         int // -1 или +1, направление обхода
+	OrbitChangeTimer int // тиков до смены направления
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {

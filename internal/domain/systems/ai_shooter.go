@@ -13,85 +13,133 @@ func stepShooter(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float6
 		e.AttackTimer--
 	}
 
-	losX, losY, los := losToRect(w, ecx, ecy, w.Player.Rect())
-
-	approachSpeed := 0.0
-	if e.PrevPlayerDist > 0.01 {
-		approachSpeed = e.PrevPlayerDist - dist
-	}
-	e.PrevPlayerDist = dist
-
-	panic := 0.0
-	if dist < stats.PreferredMin && stats.PreferredMin > 0 {
-		panic = 1 - dist/stats.PreferredMin
-	}
-	if approachSpeed > 0 {
-		sf := math.Min(approachSpeed/world.ShooterFastApproach, 1.2)
-		if sf > panic {
-			panic = sf
-		}
+	// Застряли — выходим через A*.
+	if e.StuckTicks > 10 {
+		e.Path = nil
+		e.PathIndex = 0
+		e.PathCooldown = 0
+		moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
+		return
 	}
 
-	fullPanic := panic >= world.ShooterFullPanic
-	// Видимость с учётом размера снаряда: линия проходит не вплотную
-	// к стене. Для нахождения видимой точки тела игрока —
-	// losToRect, для проверки что снаряд долетит — доп. запас.
-	losX, losY, canSee := losToRectWithPad(w, ecx, ecy, w.Player.Rect(),
+	losX, losY, los := losToRectWithPad(w, ecx, ecy, w.Player.Rect(),
 		stats.ProjectileSize/2+1)
 
-	if canSee && !fullPanic && e.AttackTimer == 0 {
+	// Стреляем только когда видим игрока.
+	if los && e.AttackTimer == 0 {
 		fireEnemyProjectileAt(w, e, ecx, ecy, losX, losY)
 		span := stats.AttackCooldownMax - stats.AttackCooldownMin
 		e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
 	}
 
+	// Вектор от игрока к стрелку и его длина.
 	awayX := ecx - pcx
 	awayY := ecy - pcy
 	awayLen := math.Hypot(awayX, awayY)
 	if awayLen < 0.01 {
 		awayX, awayY = 1, 0
+		awayLen = 1
 	} else {
 		awayX /= awayLen
 		awayY /= awayLen
 	}
 
-	if fullPanic {
-		rx := ecx + awayX*world.ShooterFastRetreatDist
-		ry := ecy + awayY*world.ShooterFastRetreatDist
-		moveEnemyToPoint(w, e, ecx, ecy, rx, ry)
-		return
-	}
+	// Перпендикуляр — для движения по орбите.
+	perpX := -awayY
+	perpY := awayX
 
-	if panic >= world.ShooterPanicThreshold {
-		speed := e.Speed() * world.ShooterSlowRetreatMul
-		moveEnemyX(w, e, awayX*speed)
-		moveEnemyY(w, e, awayY*speed)
-		return
-	}
-
-	if los {
-		if dist > stats.PreferredMax {
-			advanceToward(w, e, ecx, ecy, pcx, pcy)
+	// Если игрока не видим — обходим стену через поиск позиции.
+	if !los {
+		sx, sy, ok := shootPosition(w, e, pcx, pcy)
+		if !ok {
+			moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
 			return
 		}
-		e.Path = nil
-		e.PathIndex = 0
-		e.PathCooldown = 0
+		moveEnemyToPoint(w, e, ecx, ecy, sx, sy)
 		return
 	}
 
-	sx, sy, ok := shootPosition(w, e, pcx, pcy)
-	if !ok {
-		moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
-		return
+	// --- Игрок виден. Работаем по зонам дистанции ---
+
+	switch {
+	case dist > stats.PreferredMax:
+		// Игрок убегает — преследуем.
+		moveEnemyDirect(w, e, ecx, ecy, pcx, pcy)
+
+	case dist < stats.PreferredMin:
+		// Игрок приближается — пятимся назад с половиной скорости.
+		// Добавляем лёгкий боковой сдвиг, чтобы не пятиться строго по прямой.
+		drift := math.Sin(float64(e.AITimer)*0.1) * 0.3
+		dx := awayX + perpX*drift
+		dy := awayY + perpY*drift
+		l := math.Hypot(dx, dy)
+		if l > 0.01 {
+			dx /= l
+			dy /= l
+		}
+		speed := e.Speed() * 0.5
+		moveEnemyX(w, e, dx*speed)
+		moveEnemyY(w, e, dy*speed)
+
+	default:
+		// Комфортная зона — движемся по орбите вокруг игрока.
+		// Направление выбирается один раз и держится N тиков,
+		// потом меняется случайно. Это делает стрелка
+		// непредсказуемым, но не позволяет ему метаться.
+		e.AITimer++
+		if e.AITimer >= e.OrbitChangeTimer {
+			e.AITimer = 0
+			e.OrbitChangeTimer = 60 + w.Rng.Intn(90) // 1..2.5 сек
+			// Направление орбиты: -1 или +1.
+			if w.Rng.Intn(2) == 0 {
+				e.OrbitDir = -1
+			} else {
+				e.OrbitDir = 1
+			}
+		}
+
+		// Двигаемся перпендикулярно к игроку, с лёгким
+		// радиальным подтягиванием к центру зоны.
+		idealDist := (stats.PreferredMin + stats.PreferredMax) / 2
+		radialErr := dist - idealDist
+		// Нормализуем ошибку: 0..1 по половине ширины зоны.
+		halfWidth := (stats.PreferredMax - stats.PreferredMin) / 2
+		radialPull := 0.0
+		if halfWidth > 0.01 {
+			radialPull = clamp(radialErr/halfWidth, -1, 1) * 0.5
+		}
+
+		dx := perpX*float64(e.OrbitDir) + awayX*radialPull
+		dy := perpY*float64(e.OrbitDir) + awayY*radialPull
+		l := math.Hypot(dx, dy)
+		if l < 0.01 {
+			return
+		}
+		dx /= l
+		dy /= l
+		speed := e.Speed() * 0.8
+		moveEnemyX(w, e, dx*speed)
+		moveEnemyY(w, e, dy*speed)
 	}
-	moveEnemyToPoint(w, e, ecx, ecy, sx, sy)
 }
 
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// shootPosition — поиск точки с LOS на игрока в комфортной зоне.
+// Используется, когда стрелок потерял видимость.
 func shootPosition(w *world.World, e *world.Enemy, pcx, pcy float64) (float64, float64, bool) {
 	if e.ShootPosTimer > 0 {
 		e.ShootPosTimer--
-		if hasLineOfSight(w, e.ShootPosX, e.ShootPosY, pcx, pcy) {
+		if _, _, ok := losToRectWithPad(w, e.ShootPosX, e.ShootPosY,
+			w.Player.Rect(), e.Type.Stats().ProjectileSize/2+1); ok {
 			return e.ShootPosX, e.ShootPosY, true
 		}
 		e.ShootPosTimer = 0
@@ -104,40 +152,38 @@ func shootPosition(w *world.World, e *world.Enemy, pcx, pcy float64) (float64, f
 	stats := e.Type.Stats()
 	ecx, ecy := e.Center()
 
-	pcxCell, pcyCell := grid.WorldToCell(pcx, pcy)
-	radiusInCells := int((stats.PreferredMax + grid.CellSize) / grid.CellSize)
+	ideal := (stats.PreferredMin + stats.PreferredMax) / 2
+	distances := []float64{stats.PreferredMin, ideal, stats.PreferredMax}
+
+	baseAngle := w.Rng.Float64() * math.Pi * 2
 
 	bestScore := math.Inf(-1)
 	var bestX, bestY float64
 	found := false
 
-	for dy := -radiusInCells; dy <= radiusInCells; dy++ {
-		for dx := -radiusInCells; dx <= radiusInCells; dx++ {
-			cx := pcxCell + dx
-			cy := pcyCell + dy
-			if grid.IsBlocked(cx, cy) {
+	for i := 0; i < 8; i++ {
+		angle := baseAngle + float64(i)*math.Pi/4
+		cos := math.Cos(angle)
+		sin := math.Sin(angle)
+
+		for _, d := range distances {
+			wx := pcx + cos*d
+			wy := pcy + sin*d
+
+			cxCell, cyCell := grid.WorldToCell(wx, wy)
+			if grid.IsBlocked(cxCell, cyCell) {
 				continue
 			}
-			wx, wy := grid.CellCenter(cx, cy)
-
-			d := math.Hypot(wx-pcx, wy-pcy)
-			if d < stats.PreferredMin || d > stats.PreferredMax {
+			if math.Hypot(wx-ecx, wy-ecy) < 40 {
 				continue
 			}
 			if _, _, ok := losToRectWithPad(w, wx, wy, w.Player.Rect(),
 				stats.ProjectileSize/2+1); !ok {
 				continue
 			}
-			if math.Hypot(wx-ecx, wy-ecy) < grid.CellSize {
-				continue
-			}
 
-			idealDist := (stats.PreferredMin + stats.PreferredMax) / 2
-			distScore := -math.Abs(d - idealDist)
 			shooterDist := math.Hypot(wx-ecx, wy-ecy)
-			pathScore := -shooterDist * 0.3
-
-			score := distScore + pathScore
+			score := -shooterDist
 			if score > bestScore {
 				bestScore = score
 				bestX, bestY = wx, wy

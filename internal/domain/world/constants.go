@@ -4,8 +4,8 @@ const (
 	ScreenWidth  = 960
 	ScreenHeight = 640
 
-	WorldWidth  = 2000.0
-	WorldHeight = 1500.0
+	WorldWidth  = 3200.0
+	WorldHeight = 2400.0
 	WallThick   = 30.0
 
 	PlayerSize    = 24.0
@@ -39,4 +39,12 @@ const (
 	ShooterPanicThreshold = 0.85
 	// Доля, выше которой он бросает стрельбу и сосредотачивается на побеге.
 	ShooterFullPanic = 0.95
+
+	// Разведчик: порог скорости прицела, при котором он паникует.
+	ScoutAimSpeedPanic = 25.0
+
+	// Разведчик: порог "точного наведения" — прицел в этом радиусе
+	// и движется медленно.
+	ScoutPreciseRadius = 40.0
+	ScoutPreciseSpeed  = 6.0
 )

@@ -65,6 +65,10 @@ var (
 
 	ColorScout     = color.NRGBA{R: 90, G: 220, B: 130, A: 255}
 	ColorScoutFlee = color.NRGBA{R: 140, G: 240, B: 170, A: 255} // когда ранен
+
+	ColorNavGridBlocked = color.NRGBA{R: 200, G: 60, B: 60, A: 40}
+	ColorNavPath        = color.NRGBA{R: 100, G: 255, B: 100, A: 200}
+	ColorNavPathNode    = color.NRGBA{R: 255, G: 255, B: 100, A: 220}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
@@ -116,6 +120,8 @@ type SceneRenderer interface {
 	DrawRect(x, y, w, h float64, c color.NRGBA)
 	DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawCircle(x, y, r float64, c color.NRGBA)
+
+	DrawWorldCell(x, y, size float64, c color.NRGBA)
 
 	DrawScreenRect(x, y, w, h float64, c color.NRGBA)
 	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)

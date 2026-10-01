@@ -85,3 +85,8 @@ func (r *Renderer) DrawScreenText(s string, x, y float64, c color.NRGBA) {
 	op.ColorScale.ScaleWithColor(c)
 	text.Draw(r.screen, s, screenTextFace, op)
 }
+
+func (r *Renderer) DrawWorldCell(x, y, size float64, c color.NRGBA) {
+	sx, sy := r.w2s(x, y)
+	ebitenutil.DrawRect(r.screen, sx, sy, size*r.zoom, size*r.zoom, c)
+}
