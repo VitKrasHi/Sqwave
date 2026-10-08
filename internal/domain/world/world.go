@@ -32,6 +32,7 @@ const (
 	MapTestScout
 	MapTestMedic
 	MapTestRammer
+	MapTestSniper
 )
 
 func New() *World {
@@ -64,6 +65,8 @@ func NewWithMap(seed int64, kind MapKind) *World {
 		Player: Player{
 			X:         playerX,
 			Y:         playerY,
+			PrevX:     playerX,
+			PrevY:     playerY,
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
 		},

@@ -10,6 +10,7 @@ const (
 	EnemyScout
 	EnemyMedic
 	EnemyRammer
+	EnemySniper
 )
 
 type EnemyStats struct {
@@ -38,6 +39,12 @@ type EnemyStats struct {
 	DashCooldownMin int
 	DashCooldownMax int
 	DashDamage      int
+
+	SniperAimDuration int
+	SniperIdleMin     int
+	SniperIdleMax     int
+	SniperDamageMin   int
+	SniperDamageMax   int
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -109,7 +116,24 @@ var enemyStats = map[EnemyType]EnemyStats{
 		DashCooldownMax:   140,
 		DashDamage:        100, // ×2 от базового 50
 	},
+	EnemySniper: {
+		Name:              "Sniper",
+		MaxHP:             100,
+		SP:                120,
+		Size:              20,
+		PreferredMin:      350, // радиус паники
+		SniperAimDuration: 45,
+		SniperIdleMin:     60,
+		SniperIdleMax:     300,
+		SniperDamageMin:   50,
+		SniperDamageMax:   200,
+	},
 }
+
+const (
+	SniperStateIdle = iota
+	SniperStateAiming
+)
 
 func (t EnemyType) Stats() EnemyStats {
 	if s, ok := enemyStats[t]; ok {
@@ -190,6 +214,16 @@ type Enemy struct {
 	DashDirY     float64
 	DashCooldown int
 	DashHit      bool
+
+	// Снайпер.
+	SniperState      int
+	SniperTimer      int
+	SniperAimX       float64
+	SniperAimY       float64
+	SniperShotX      float64
+	SniperShotY      float64
+	SniperShotLife   int
+	SniperLeadFactor float64
 
 	GroupID int
 }

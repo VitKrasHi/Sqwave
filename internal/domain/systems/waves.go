@@ -21,6 +21,7 @@ func StepWaves(w *world.World) {
 		return
 	}
 
+	// Спавн текущей группы ещё не закончен.
 	if ws.GroupRemaining > 0 {
 		if ws.GroupSpawnTimer > 0 {
 			ws.GroupSpawnTimer--
@@ -31,13 +32,15 @@ func StepWaves(w *world.World) {
 		return
 	}
 
+	// Группа выпущена. Ждём её смерти.
 	if groupAlive(w, ws.GroupID) {
 		return
 	}
 
 	recomputeKilled(w, ws)
 
-	if ws.TotalPoolRemaining() == 0 {
+	// Пул кончился? Спавнить больше нечего.
+	if ws.SpawnedCount >= ws.WaveSize {
 		ws.Active = false
 		ws.PauseTimer = wavePauseTicks
 		return
@@ -49,15 +52,9 @@ func StepWaves(w *world.World) {
 func startWave(w *world.World) {
 	ws := &w.Wave
 	ws.Number++
-	size := world.WaveSizeFor(ws.Number, w.Rng)
-	comp := world.WaveCompositionFor(ws.Number, size, w.Rng)
+	ws.WaveSize = world.WaveSizeFor(ws.Number, w.Rng)
 
-	ws.Composition = comp
-	ws.PoolInfantry = comp.Infantry
-	ws.PoolShooter = comp.Shooter
-	ws.PoolScout = comp.Scout
-	ws.PoolMedic = comp.Medic
-	ws.PoolRammer = comp.Rammer
+	ws.Composition = world.WaveComposition{}
 
 	ws.SpawnedCount = 0
 	ws.KilledCount = 0
@@ -71,7 +68,7 @@ func startWave(w *world.World) {
 func startGroup(w *world.World) {
 	ws := &w.Wave
 
-	remaining := ws.TotalPoolRemaining()
+	remaining := ws.WaveSize - ws.SpawnedCount
 	if remaining <= 0 {
 		return
 	}
@@ -91,16 +88,13 @@ func startGroup(w *world.World) {
 func spawnOneFromGroup(w *world.World) {
 	ws := &w.Wave
 
-	t := pickEnemyType(w, ws)
-	if t == -1 {
-		ws.GroupRemaining = 0
-		return
-	}
+	// Равновероятный выбор типа.
+	t := world.RandomEnemyType(w.Rng)
 
 	pos, ok := findFreeSpotNear(w, ws.GroupOriginX, ws.GroupOriginY, 120)
 	if !ok {
-		returnTypeToPool(ws, t)
-		ws.GroupRemaining--
+		// Не нашли точку — не тратим слот, повторим на следующем тике.
+		ws.GroupSpawnTimer = 3
 		return
 	}
 
@@ -108,38 +102,24 @@ func spawnOneFromGroup(w *world.World) {
 	e.GroupID = ws.GroupID
 	w.Enemies = append(w.Enemies, e)
 
+	// Обновляем оценочный состав для HUD.
+	switch t {
+	case world.EnemyInfantry:
+		ws.Composition.Infantry++
+	case world.EnemyShooter:
+		ws.Composition.Shooter++
+	case world.EnemyScout:
+		ws.Composition.Scout++
+	case world.EnemyMedic:
+		ws.Composition.Medic++
+	case world.EnemyRammer:
+		ws.Composition.Rammer++
+	case world.EnemySniper:
+		ws.Composition.Sniper++
+	}
+
 	ws.GroupRemaining--
 	ws.SpawnedCount++
-}
-
-func pickEnemyType(w *world.World, ws *world.WaveState) world.EnemyType {
-	inf := ws.PoolInfantry
-	sh := ws.PoolShooter
-	sc := ws.PoolScout
-	md := ws.PoolMedic
-	rm := ws.PoolRammer
-	total := inf + sh + sc + md + rm
-	if total == 0 {
-		return -1
-	}
-	pick := w.Rng.Intn(total)
-	switch {
-	case pick < inf:
-		ws.PoolInfantry--
-		return world.EnemyInfantry
-	case pick < inf+sh:
-		ws.PoolShooter--
-		return world.EnemyShooter
-	case pick < inf+sh+sc:
-		ws.PoolScout--
-		return world.EnemyScout
-	case pick < inf+sh+sc+md:
-		ws.PoolMedic--
-		return world.EnemyMedic
-	default:
-		ws.PoolRammer--
-		return world.EnemyRammer
-	}
 }
 
 func pickGroupOrigin(w *world.World) (float64, float64) {
@@ -150,19 +130,16 @@ func pickGroupOrigin(w *world.World) (float64, float64) {
 
 	for attempt := 0; attempt < 30; attempt++ {
 		p := world.SpawnPoints[w.Rng.Intn(len(world.SpawnPoints))]
-
 		x := p.X + (w.Rng.Float64()*2-1)*80
 		y := p.Y + (w.Rng.Float64()*2-1)*80
 
 		if pointInWall(w, x, y, 30) {
 			continue
 		}
-
 		dist := math.Hypot(x-pcx, y-pcy)
 		if dist < 500 {
 			continue
 		}
-
 		if dist > bestScore {
 			bestScore = dist
 			bestX, bestY = x, y
@@ -262,6 +239,8 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemyMedic
 	case world.MapTestRammer:
 		t = world.EnemyRammer
+	case world.MapTestSniper:
+		t = world.EnemySniper
 	default:
 		return
 	}
@@ -285,5 +264,7 @@ func returnTypeToPool(ws *world.WaveState, t world.EnemyType) {
 		ws.PoolMedic++
 	case world.EnemyRammer:
 		ws.PoolRammer++
+	case world.EnemySniper:
+		ws.PoolSniper++
 	}
 }

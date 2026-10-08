@@ -144,7 +144,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	drawMedicBeams(r, w)
-
+	drawSniperBeams(r, w)
 	drawEnemies(r, w)
 
 	p := &w.Player
@@ -402,6 +402,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			} else {
 				c = ColorRammer
 			}
+		case world.EnemySniper:
+			c = ColorSniper
 		default:
 			c = ColorEnemy
 		}
@@ -537,5 +539,41 @@ func drawMedicBeams(r SceneRenderer, w *world.World) {
 		thickness := 2.0 + pulse
 
 		r.DrawLine(mcx, mcy, tcx, tcy, thickness, ColorMedicBeam)
+	}
+}
+
+func drawSniperBeams(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() || e.Type != world.EnemySniper {
+			continue
+		}
+		ecx, ecy := e.Center()
+
+		// Яркий луч выстрела.
+		if e.SniperShotLife > 0 {
+			alpha := uint8(255 * e.SniperShotLife / 12)
+			c := ColorSniperShot
+			c.A = alpha
+			r.DrawLine(ecx, ecy, e.SniperShotX, e.SniperShotY, 3, c)
+		}
+
+		// Тонкая линия прицеливания.
+		if e.SniperState == world.SniperStateAiming {
+			progress := 1.0 - float64(e.SniperTimer)/float64(e.Type.Stats().SniperAimDuration)
+			if progress < 0 {
+				progress = 0
+			}
+			if progress > 1 {
+				progress = 1
+			}
+			// Линия обрезается о стены.
+			ex, ey := clipToWalls(w, ecx, ecy, e.SniperAimX, e.SniperAimY)
+
+			c := ColorSniperAim
+			c.A = uint8(40 + 80*progress)
+			thickness := 1.0 + progress*0.5
+			r.DrawLine(ecx, ecy, ex, ey, thickness, c)
+		}
 	}
 }

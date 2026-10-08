@@ -76,6 +76,10 @@ var (
 	ColorRammer      = color.NRGBA{R: 180, G: 40, B: 60, A: 255}
 	ColorRammerDash  = color.NRGBA{R: 255, G: 80, B: 100, A: 255}
 	ColorRammerSwing = color.NRGBA{R: 220, G: 80, B: 100, A: 255}
+
+	ColorSniper     = color.NRGBA{R: 160, G: 40, B: 90, A: 255}
+	ColorSniperAim  = color.NRGBA{R: 255, G: 40, B: 40, A: 100}
+	ColorSniperShot = color.NRGBA{R: 255, G: 120, B: 120, A: 255}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

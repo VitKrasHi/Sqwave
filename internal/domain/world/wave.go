@@ -8,10 +8,11 @@ type WaveComposition struct {
 	Scout    int
 	Medic    int
 	Rammer   int
+	Sniper   int
 }
 
 func (c WaveComposition) Total() int {
-	return c.Infantry + c.Shooter + c.Scout + c.Medic + c.Rammer
+	return c.Infantry + c.Shooter + c.Scout + c.Medic + c.Rammer + c.Sniper
 }
 
 type WaveState struct {
@@ -23,6 +24,7 @@ type WaveState struct {
 	PoolScout    int
 	PoolMedic    int
 	PoolRammer   int
+	PoolSniper   int
 
 	GroupID         int
 	GroupRemaining  int
@@ -35,10 +37,13 @@ type WaveState struct {
 
 	PauseTimer int
 	Active     bool
+
+	WaveSize int
 }
 
 func (ws *WaveState) TotalPoolRemaining() int {
-	return ws.PoolInfantry + ws.PoolShooter + ws.PoolScout + ws.PoolMedic + ws.PoolRammer
+	return ws.PoolInfantry + ws.PoolShooter + ws.PoolScout +
+		ws.PoolMedic + ws.PoolRammer + ws.PoolSniper
 }
 
 // intRng — минимальный интерфейс для генератора случайных чисел.
@@ -56,6 +61,23 @@ func WaveSizeFor(n int, rng intRng) int {
 	}
 	spread := base / 6
 	return base - spread + rng.Intn(spread*2+1)
+}
+
+func RandomEnemyType(rng intRng) EnemyType {
+	switch rng.Intn(6) {
+	case 0:
+		return EnemyInfantry
+	case 1:
+		return EnemyShooter
+	case 2:
+		return EnemyScout
+	case 3:
+		return EnemyMedic
+	case 4:
+		return EnemyRammer
+	default:
+		return EnemySniper
+	}
 }
 
 // WaveCompositionFor — состав волны по номеру.
@@ -82,7 +104,12 @@ func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
 		rmW = 3 + rng.Intn(8)
 	}
 
-	sum := infW + shW + scW + mdW + rmW
+	snW := 0
+	if rng.Intn(100) < 20 {
+		snW = 2 + rng.Intn(5)
+	}
+
+	sum := infW + shW + scW + mdW + rmW + snW
 	if sum == 0 {
 		return WaveComposition{Infantry: total}
 	}
@@ -92,11 +119,12 @@ func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
 	sc := total * scW / sum
 	md := total * mdW / sum
 	rm := total - inf - sh - sc - md
-	if rm < 0 {
-		rm = 0
+	sn := total - inf - sh - sc - md - rm
+	if sn < 0 {
+		sn = 0
 	}
 
-	diff := total - (inf + sh + sc + md + rm)
+	diff := total - (inf + sh + sc + md + rm + sn)
 	inf += diff
 	if inf < 0 {
 		inf = 0
@@ -108,12 +136,14 @@ func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
 		Scout:    sc,
 		Medic:    md,
 		Rammer:   rm,
+		Sniper:   sn,
 	}
 }
 
 // SpawnPoints — базовые точки для выбора «центра» группы.
 // Используются в systems.pickGroupOrigin: сначала берётся одна
 // из этих точек, потом добавляется случайный разброс ±80.
+// SpawnPoints — базовые точки для выбора центра группы.
 var SpawnPoints = []geometry.Point{
 	{X: 1050, Y: 700},
 	{X: 2150, Y: 700},

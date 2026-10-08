@@ -25,7 +25,7 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	}
 
 	if p.Weapon == world.WeaponSniper {
-		stepSniper(w, in)
+		stepPlayerSniper(w, in)
 		return
 	}
 
@@ -59,7 +59,7 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 // stepSniper: зажал → копится заряд, отпустил → выстрел.
 // Если отпустил без накопления (быстрый клик) — всё равно стреляет,
 // но с минимальным зарядом.
-func stepSniper(w *world.World, in input.PlayerInput) {
+func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 	p := &w.Player
 	weapon := p.Weapon.Stats()
 

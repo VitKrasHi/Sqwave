@@ -34,6 +34,9 @@ type Player struct {
 	PrevAimX, PrevAimY float64
 	HasPrevAim         bool
 
+	PrevX, PrevY float64
+	VelX, VelY   float64
+
 	IsFiring bool
 }
 

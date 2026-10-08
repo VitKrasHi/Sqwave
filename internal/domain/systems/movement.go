@@ -72,6 +72,12 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	if p.Dashing() && blocked {
 		p.DashTimer = 0
 	}
+
+	// Обновляем скорость — нужна снайперу для предсказания.
+	p.VelX = p.X - p.PrevX
+	p.VelY = p.Y - p.PrevY
+	p.PrevX = p.X
+	p.PrevY = p.Y
 }
 
 // moveX двигает игрока по X и возвращает true, если движение
