@@ -81,13 +81,8 @@ func (g *Game) Update() error {
 	systems.StepExplosions(g.world)
 	systems.StepWaves(g.world)
 	systems.StepEnemies(g.world)
+	systems.StepMedicHeal(g.world)
 	systems.StepEnemyProjectiles(g.world)
-	systems.StepEnemyProjectiles(g.world)
-
-	if !g.menu.Open {
-		systems.StepWaves(g.world)
-	}
-	systems.StepEnemies(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -147,6 +142,8 @@ func (g *Game) Draw(r SceneRenderer) {
 	if g.debugNav {
 		drawNavDebug(r, w)
 	}
+
+	drawMedicBeams(r, w)
 
 	drawEnemies(r, w)
 
@@ -395,6 +392,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			} else {
 				c = ColorScout
 			}
+		case world.EnemyMedic:
+			c = ColorMedic
 		default:
 			c = ColorEnemy
 		}
@@ -497,5 +496,29 @@ func drawNavDebug(r SceneRenderer, w *world.World) {
 			wp := e.Path[j]
 			r.DrawRect(wp.X-3, wp.Y-3, 6, 6, ColorNavPathNode)
 		}
+	}
+}
+
+func drawMedicBeams(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		medic := &w.Enemies[i]
+		if medic.IsDead() || medic.Type != world.EnemyMedic {
+			continue
+		}
+		if medic.HealTargetIdx < 0 || medic.HealTargetIdx >= len(w.Enemies) {
+			continue
+		}
+		target := &w.Enemies[medic.HealTargetIdx]
+		if !systems.MedicCanHeal(w, medic, target) {
+			continue // луч показывается только когда реально лечим
+		}
+
+		mcx, mcy := medic.Center()
+		tcx, tcy := target.Center()
+
+		pulse := math.Sin(float64(medic.HealTick)*0.3)*0.5 + 1.0
+		thickness := 2.0 + pulse
+
+		r.DrawLine(mcx, mcy, tcx, tcy, thickness, ColorMedicBeam)
 	}
 }

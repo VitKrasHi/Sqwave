@@ -30,6 +30,7 @@ const (
 	MapTestInfantry
 	MapTestShooter
 	MapTestScout
+	MapTestMedic
 )
 
 func New() *World {
@@ -79,15 +80,12 @@ func NewWithMap(seed int64, kind MapKind) *World {
 	w.SpatialHash = NewSpatialHash(WorldWidth, WorldHeight)
 
 	switch kind {
-	case MapTestInfantry, MapTestShooter, MapTestScout:
-		// Волны не запускаются — врагов расставляет StartTestRoom.
-		w.Wave = WaveState{SpawnInterval: 20}
+	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic:
+		w.Wave = WaveState{}
 	default:
 		w.Wave = WaveState{
-			Number:          0,
-			SpawnInterval:   8,
-			GroupSize:       5,
-			GroupPauseTicks: 300,
+			Number:     0,
+			PauseTimer: 60, // 1 сек перед первой волной
 		}
 	}
 	return w
@@ -111,7 +109,7 @@ func buildNavGrid(walls []geometry.Rect) *geometry.Grid {
 
 func wallsForMap(kind MapKind) []geometry.Rect {
 	switch kind {
-	case MapTestInfantry, MapTestShooter, MapTestScout:
+	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic:
 		return testRoomWalls()
 	default:
 		return defaultWalls()

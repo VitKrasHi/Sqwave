@@ -69,6 +69,9 @@ var (
 	ColorNavGridBlocked = color.NRGBA{R: 200, G: 60, B: 60, A: 40}
 	ColorNavPath        = color.NRGBA{R: 100, G: 255, B: 100, A: 200}
 	ColorNavPathNode    = color.NRGBA{R: 255, G: 255, B: 100, A: 220}
+
+	ColorMedic     = color.NRGBA{R: 100, G: 180, B: 255, A: 255}
+	ColorMedicBeam = color.NRGBA{R: 100, G: 255, B: 140, A: 200}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

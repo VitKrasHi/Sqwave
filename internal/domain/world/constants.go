@@ -22,7 +22,7 @@ const (
 	DashCooldown = 40
 
 	EnemyBaseSpeed  = 1.0
-	EnemySpeedPerSP = 0.01
+	EnemySpeedPerSP = 0.03
 
 	NavCellSize     = 24.0
 	AgentClearance  = 4.0 // запас вокруг тела при сглаживании пути
@@ -47,4 +47,13 @@ const (
 	// и движется медленно.
 	ScoutPreciseRadius = 40.0
 	ScoutPreciseSpeed  = 6.0
+
+	// Медик.
+	MedicHealTickRate      = 1 // лечим 1 HP раз в N тиков (было 3)
+	MedicHealPerTick       = 3 // HP за одно срабатывание
+	MedicHealRange         = 220.0
+	MedicCriticalHPRatio   = 0.25
+	MedicFollowSpeedFactor = 1.05
+	MedicAllyRadius        = 900.0 // было 320 — теперь видит почти всю карту
+	MedicPlayerFleeRange   = 140.0
 )

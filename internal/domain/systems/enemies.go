@@ -94,6 +94,8 @@ func StepEnemies(w *world.World) {
 			stepShooter(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyScout:
 			stepScout(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyMedic:
+			stepMedic(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 

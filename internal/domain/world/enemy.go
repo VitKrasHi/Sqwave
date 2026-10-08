@@ -8,6 +8,7 @@ const (
 	EnemyInfantry EnemyType = iota
 	EnemyShooter
 	EnemyScout
+	EnemyMedic
 )
 
 type EnemyStats struct {
@@ -72,6 +73,17 @@ var enemyStats = map[EnemyType]EnemyStats{
 		ProjectileLife:    20, // короткая жизнь — дробь летит недалеко
 		ProjectileCount:   8,
 		ProjectileSpread:  30,
+	},
+	EnemyMedic: {
+		Name:              "Medic",
+		MaxHP:             100,
+		SP:                120,
+		Damage:            0,
+		Size:              22,
+		PreferredMin:      80,  // держится не ближе этого от игрока
+		PreferredMax:      200, // и не дальше этого от союзников
+		AttackCooldownMin: 0,
+		AttackCooldownMax: 0,
 	},
 }
 
@@ -141,18 +153,26 @@ type Enemy struct {
 	// Стрелок: движение по орбите вокруг игрока.
 	OrbitDir         int // -1 или +1, направление обхода
 	OrbitChangeTimer int // тиков до смены направления
+
+	// Медик.
+	HealTargetIdx int // индекс союзника, которого лечит (-1 если нет)
+	HealTick      int // счётчик лечения для визуальных эффектов
+	HealPulse     int // для пульсации луча
+
+	GroupID int
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {
 	hp := t.Stats().MaxHP
 	return Enemy{
-		Type:   t,
-		X:      x,
-		Y:      y,
-		LastX:  x,
-		LastY:  y,
-		HP:     hp,
-		LastHP: hp,
+		Type:          t,
+		X:             x,
+		Y:             y,
+		LastX:         x,
+		LastY:         y,
+		HP:            hp,
+		LastHP:        hp,
+		HealTargetIdx: -1, // ← добавить
 	}
 }
 

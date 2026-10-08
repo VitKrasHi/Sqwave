@@ -50,6 +50,8 @@ func main() {
 		kind = world.MapTestShooter
 	case "scout":
 		kind = world.MapTestScout
+	case "medic":
+		kind = world.MapTestMedic
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}
