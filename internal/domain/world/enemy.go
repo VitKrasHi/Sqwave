@@ -9,6 +9,7 @@ const (
 	EnemyShooter
 	EnemyScout
 	EnemyMedic
+	EnemyRammer
 )
 
 type EnemyStats struct {
@@ -30,6 +31,13 @@ type EnemyStats struct {
 	ProjectileLife   int
 	ProjectileCount  int     // пеллет за выстрел (дробовик разведчика = 8)
 	ProjectileSpread float64 // полный угол разброса в градусах
+
+	// Таран: длинный рывок с ускорением.
+	DashSpeedMul    float64
+	DashDuration    int
+	DashCooldownMin int
+	DashCooldownMax int
+	DashDamage      int
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -84,6 +92,22 @@ var enemyStats = map[EnemyType]EnemyStats{
 		PreferredMax:      200, // и не дальше этого от союзников
 		AttackCooldownMin: 0,
 		AttackCooldownMax: 0,
+	},
+	EnemyRammer: {
+		Name:              "Rammer",
+		MaxHP:             200,
+		SP:                100,
+		Damage:            50, // урон щитом в ближнем бою
+		Size:              28,
+		MeleeRange:        70,
+		AttackCooldownMin: 40,
+		AttackCooldownMax: 70,
+		SwingDuration:     8,
+		DashSpeedMul:      4.0,
+		DashDuration:      50,
+		DashCooldownMin:   60,
+		DashCooldownMax:   140,
+		DashDamage:        100, // ×2 от базового 50
 	},
 }
 
@@ -158,6 +182,14 @@ type Enemy struct {
 	HealTargetIdx int // индекс союзника, которого лечит (-1 если нет)
 	HealTick      int // счётчик лечения для визуальных эффектов
 	HealPulse     int // для пульсации луча
+
+	// Таран.
+	DashActive   bool
+	DashTimer    int
+	DashDirX     float64
+	DashDirY     float64
+	DashCooldown int
+	DashHit      bool
 
 	GroupID int
 }

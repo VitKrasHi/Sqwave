@@ -31,6 +31,7 @@ const (
 	MapTestShooter
 	MapTestScout
 	MapTestMedic
+	MapTestRammer
 )
 
 func New() *World {
@@ -109,7 +110,7 @@ func buildNavGrid(walls []geometry.Rect) *geometry.Grid {
 
 func wallsForMap(kind MapKind) []geometry.Rect {
 	switch kind {
-	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic:
+	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic, MapTestRammer:
 		return testRoomWalls()
 	default:
 		return defaultWalls()

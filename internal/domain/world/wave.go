@@ -7,10 +7,11 @@ type WaveComposition struct {
 	Shooter  int
 	Scout    int
 	Medic    int
+	Rammer   int
 }
 
 func (c WaveComposition) Total() int {
-	return c.Infantry + c.Shooter + c.Scout + c.Medic
+	return c.Infantry + c.Shooter + c.Scout + c.Medic + c.Rammer
 }
 
 type WaveState struct {
@@ -21,6 +22,7 @@ type WaveState struct {
 	PoolShooter  int
 	PoolScout    int
 	PoolMedic    int
+	PoolRammer   int
 
 	GroupID         int
 	GroupRemaining  int
@@ -36,7 +38,7 @@ type WaveState struct {
 }
 
 func (ws *WaveState) TotalPoolRemaining() int {
-	return ws.PoolInfantry + ws.PoolShooter + ws.PoolScout + ws.PoolMedic
+	return ws.PoolInfantry + ws.PoolShooter + ws.PoolScout + ws.PoolMedic + ws.PoolRammer
 }
 
 // intRng — минимальный интерфейс для генератора случайных чисел.
@@ -58,30 +60,29 @@ func WaveSizeFor(n int, rng intRng) int {
 
 // WaveCompositionFor — состав волны по номеру.
 func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
-	// Вес каждого типа — случайный в своём диапазоне.
-	// Диапазон подобран так, чтобы:
-	//   - Пехотинец всегда есть, но его доля 30..70%.
-	//   - Стрелок появляется с шансом ~70%.
-	//   - Разведчик появляется с шансом ~50%.
-	//   - Медик появляется с шансом ~30%.
-	infW := 30 + rng.Intn(41) // 30..70
+	infW := 30 + rng.Intn(41)
 
 	shW := 0
 	if rng.Intn(100) < 70 {
-		shW = 10 + rng.Intn(21) // 10..30
+		shW = 10 + rng.Intn(21)
 	}
 
 	scW := 0
 	if rng.Intn(100) < 50 {
-		scW = 5 + rng.Intn(16) // 5..20
+		scW = 5 + rng.Intn(16)
 	}
 
 	mdW := 0
 	if rng.Intn(100) < 30 {
-		mdW = 2 + rng.Intn(9) // 2..10
+		mdW = 2 + rng.Intn(9)
 	}
 
-	sum := infW + shW + scW + mdW
+	rmW := 0
+	if rng.Intn(100) < 25 {
+		rmW = 3 + rng.Intn(8)
+	}
+
+	sum := infW + shW + scW + mdW + rmW
 	if sum == 0 {
 		return WaveComposition{Infantry: total}
 	}
@@ -89,13 +90,13 @@ func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
 	inf := total * infW / sum
 	sh := total * shW / sum
 	sc := total * scW / sum
-	md := total - inf - sh - sc
-	if md < 0 {
-		md = 0
+	md := total * mdW / sum
+	rm := total - inf - sh - sc - md
+	if rm < 0 {
+		rm = 0
 	}
 
-	// Компенсация округлений.
-	diff := total - (inf + sh + sc + md)
+	diff := total - (inf + sh + sc + md + rm)
 	inf += diff
 	if inf < 0 {
 		inf = 0
@@ -106,6 +107,7 @@ func WaveCompositionFor(n, total int, rng intRng) WaveComposition {
 		Shooter:  sh,
 		Scout:    sc,
 		Medic:    md,
+		Rammer:   rm,
 	}
 }
 

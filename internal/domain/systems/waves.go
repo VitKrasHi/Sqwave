@@ -50,13 +50,14 @@ func startWave(w *world.World) {
 	ws := &w.Wave
 	ws.Number++
 	size := world.WaveSizeFor(ws.Number, w.Rng)
-	comp := world.WaveCompositionFor(ws.Number, size, w.Rng) // ← добавили w.Rng
+	comp := world.WaveCompositionFor(ws.Number, size, w.Rng)
 
 	ws.Composition = comp
 	ws.PoolInfantry = comp.Infantry
 	ws.PoolShooter = comp.Shooter
 	ws.PoolScout = comp.Scout
 	ws.PoolMedic = comp.Medic
+	ws.PoolRammer = comp.Rammer
 
 	ws.SpawnedCount = 0
 	ws.KilledCount = 0
@@ -116,7 +117,8 @@ func pickEnemyType(w *world.World, ws *world.WaveState) world.EnemyType {
 	sh := ws.PoolShooter
 	sc := ws.PoolScout
 	md := ws.PoolMedic
-	total := inf + sh + sc + md
+	rm := ws.PoolRammer
+	total := inf + sh + sc + md + rm
 	if total == 0 {
 		return -1
 	}
@@ -131,22 +133,12 @@ func pickEnemyType(w *world.World, ws *world.WaveState) world.EnemyType {
 	case pick < inf+sh+sc:
 		ws.PoolScout--
 		return world.EnemyScout
-	default:
+	case pick < inf+sh+sc+md:
 		ws.PoolMedic--
 		return world.EnemyMedic
-	}
-}
-
-func returnTypeToPool(ws *world.WaveState, t world.EnemyType) {
-	switch t {
-	case world.EnemyInfantry:
-		ws.PoolInfantry++
-	case world.EnemyShooter:
-		ws.PoolShooter++
-	case world.EnemyScout:
-		ws.PoolScout++
-	case world.EnemyMedic:
-		ws.PoolMedic++
+	default:
+		ws.PoolRammer--
+		return world.EnemyRammer
 	}
 }
 
@@ -268,6 +260,8 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemyScout
 	case world.MapTestMedic:
 		t = world.EnemyMedic
+	case world.MapTestRammer:
+		t = world.EnemyRammer
 	default:
 		return
 	}
@@ -276,5 +270,20 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 	}
 	for _, p := range points {
 		w.Enemies = append(w.Enemies, world.NewEnemy(t, p.x, p.y))
+	}
+}
+
+func returnTypeToPool(ws *world.WaveState, t world.EnemyType) {
+	switch t {
+	case world.EnemyInfantry:
+		ws.PoolInfantry++
+	case world.EnemyShooter:
+		ws.PoolShooter++
+	case world.EnemyScout:
+		ws.PoolScout++
+	case world.EnemyMedic:
+		ws.PoolMedic++
+	case world.EnemyRammer:
+		ws.PoolRammer++
 	}
 }

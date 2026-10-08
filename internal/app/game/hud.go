@@ -30,6 +30,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Medic > 0 {
 		lines = append(lines, line{"Medic", comp.Medic, ColorMedic})
 	}
+	if comp.Rammer > 0 {
+		lines = append(lines, line{"Rammer", comp.Rammer, ColorRammer})
+	}
 
 	const (
 		panelW  = 260.0

@@ -394,6 +394,14 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			}
 		case world.EnemyMedic:
 			c = ColorMedic
+		case world.EnemyRammer:
+			if e.DashActive {
+				c = ColorRammerDash
+			} else if e.SwingActive {
+				c = ColorRammerSwing
+			} else {
+				c = ColorRammer
+			}
 		default:
 			c = ColorEnemy
 		}
@@ -405,6 +413,15 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			}
 		}
 		r.DrawRect(e.X, e.Y, stats.Size, stats.Size, c)
+
+		if e.Type == world.EnemyRammer && e.DashActive {
+			// Хвост за тараном — рисуется назад по направлению рывка.
+			const trailLen = 40.0
+			cx, cy := e.Center()
+			tailX := cx - e.DashDirX*trailLen
+			tailY := cy - e.DashDirY*trailLen
+			r.DrawLine(cx, cy, tailX, tailY, 8, ColorRammerDash)
+		}
 
 		// Взгляд — короткий штрих из центра.
 		cx, cy := e.Center()
