@@ -6,31 +6,77 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"Sqwave/internal/app"
 	"Sqwave/internal/app/game"
+	"Sqwave/internal/app/menu"
+	"Sqwave/internal/app/setup"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
 	"Sqwave/internal/infra/ebiteninput"
 	"Sqwave/internal/infra/ebitenrender"
 )
 
-type adapter struct {
-	g *game.Game
+type App struct {
+	current app.Scene
+	mapKind world.MapKind
 }
 
-func (a *adapter) Update() error { return a.g.Update() }
-func (a *adapter) Draw(screen *ebiten.Image) {
-	a.g.Draw(ebitenrender.New(screen))
+func (a *App) Update() error {
+	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+	altEnter := (ebiten.IsKeyPressed(ebiten.KeyAltLeft) || ebiten.IsKeyPressed(ebiten.KeyAltRight)) &&
+		inpututil.IsKeyJustPressed(ebiten.KeyEnter)
+	if altEnter {
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+	return a.current.Update()
 }
-func (a *adapter) Layout(_, _ int) (int, int) {
+
+func (a *App) Draw(screen *ebiten.Image) {
+	a.current.Draw(ebitenrender.New(screen))
+}
+
+func (a *App) Layout(_, _ int) (int, int) {
 	return world.ScreenWidth, world.ScreenHeight
+}
+
+func (a *App) openMenu() {
+	a.current = menu.New(
+		func() { a.openSetup() },
+		func() { os.Exit(0) },
+	)
+}
+
+func (a *App) openSetup() {
+	a.current = setup.New(
+		func(s setup.Settings) { a.startGame(s) },
+		func() { a.openMenu() },
+	)
+}
+
+func (a *App) startGame(s setup.Settings) {
+	w := world.NewWithOptions(time.Now().UnixNano(), a.mapKind, world.Options{
+		BaseWaveSize: s.EnemiesPerWave,
+		MaxWaveLevel: s.MaxWaveLevel,
+		WavesLimit:   s.WavesLimit,
+	})
+	if a.mapKind != world.MapDefault {
+		systems.StartTestRoom(w, a.mapKind)
+	}
+	a.current = game.New(w, ebiteninput.New())
 }
 
 func main() {
 	mapName := flag.String("map", "default", "map: default|infantry|shooter|scout|medic|rammer|sniper|rocketeer")
 	fullscreen := flag.Bool("fullscreen", false, "start in fullscreen")
+	skipMenu := flag.Bool("skip-menu", false, "start directly in game (debug)")
 	profiler := flag.Bool("prof", false, "enable pprof on localhost:6060")
 	flag.Parse()
 
@@ -63,22 +109,27 @@ func main() {
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}
 
-	w := world.NewWithMap(0, kind)
-	if kind != world.MapDefault {
-		systems.StartTestRoom(w, kind)
+	a := &App{mapKind: kind}
+
+	if *skipMenu {
+		a.startGame(setup.Settings{
+			EnemiesPerWave: 100,
+			MaxWaveLevel:   5,
+			WavesLimit:     0,
+		})
+	} else {
+		a.openMenu()
 	}
 
-	g := game.New(w, ebiteninput.New())
-
 	ebiten.SetWindowSize(world.ScreenWidth, world.ScreenHeight)
-	ebiten.SetWindowTitle("Sqwave — " + *mapName)
+	ebiten.SetWindowTitle("Sqwave")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	if *fullscreen {
 		ebiten.SetFullscreen(true)
 	}
 
-	if err := ebiten.RunGame(&adapter{g: g}); err != nil {
+	if err := ebiten.RunGame(a); err != nil {
 		panic(err)
 	}
 }

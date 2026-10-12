@@ -50,11 +50,6 @@ func (g *Game) Update() error {
 		g.debugNav = !g.debugNav
 	}
 
-	// F11 — переключить полноэкранный режим.
-	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
 	in := g.input.Poll()
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y

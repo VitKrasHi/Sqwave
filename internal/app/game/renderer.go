@@ -135,12 +135,12 @@ type SceneRenderer interface {
 	DrawRect(x, y, w, h float64, c color.NRGBA)
 	DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawCircle(x, y, r float64, c color.NRGBA)
-
 	DrawWorldCell(x, y, size float64, c color.NRGBA)
 
 	DrawScreenRect(x, y, w, h float64, c color.NRGBA)
 	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawScreenText(text string, x, y float64, c color.NRGBA)
+	DrawScreenTextScaled(text string, x, y, scale float64, c color.NRGBA)
 
-	DrawText(text string, x, y float64) // оставляем для отладочного HUD
+	DrawText(text string, x, y float64)
 }

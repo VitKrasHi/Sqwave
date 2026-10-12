@@ -24,6 +24,12 @@ type World struct {
 	EnemyOccupancy   []bool
 }
 
+type Options struct {
+	BaseWaveSize int // минимум 10
+	MaxWaveLevel int // 1..10
+	WavesLimit   int // 0 = бесконечные
+}
+
 type MapKind int
 
 const (
@@ -47,54 +53,11 @@ func NewWithSeed(seed int64) *World {
 }
 
 func NewWithMap(seed int64, kind MapKind) *World {
-	spawnSize := SpawnZoneSize
-
-	playerX := WorldWidth/2 - PlayerSize/2
-	playerY := WorldHeight/2 - PlayerSize/2
-	if kind != MapDefault {
-		playerX = 700 - PlayerSize/2
-		playerY = 450 - PlayerSize/2
-	}
-
-	spawnCX := WorldWidth / 2
-	spawnCY := WorldHeight / 2
-	if kind != MapDefault {
-		spawnCX = 700
-		spawnCY = 450
-	}
-
-	w := &World{
-		Player: Player{
-			X:         playerX,
-			Y:         playerY,
-			PrevX:     playerX,
-			PrevY:     playerY,
-			Weapon:    WeaponNone,
-			Secondary: WeaponNone,
-		},
-		Walls: wallsForMap(kind),
-		SpawnZone: geometry.Rect{
-			X: spawnCX - spawnSize/2,
-			Y: spawnCY - spawnSize/2,
-			W: spawnSize,
-			H: spawnSize,
-		},
-		Rng: rand.New(rand.NewSource(seed)),
-	}
-	w.NavGrid = buildNavGrid(w.Walls)
-	w.EnemyOccupancy = make([]bool, w.NavGrid.Cols*w.NavGrid.Rows)
-	w.SpatialHash = NewSpatialHash(WorldWidth, WorldHeight)
-
-	switch kind {
-	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic:
-		w.Wave = WaveState{}
-	default:
-		w.Wave = WaveState{
-			Number:     0,
-			PauseTimer: 60, // 1 сек перед первой волной
-		}
-	}
-	return w
+	return NewWithOptions(seed, kind, Options{
+		BaseWaveSize: 100,
+		MaxWaveLevel: 5,
+		WavesLimit:   0,
+	})
 }
 
 // PlayerInSpawnZone — центр игрока внутри прямоугольника зоны спавна.
@@ -227,4 +190,64 @@ func defaultWalls() []geometry.Rect {
 		{X: 2500, Y: 1100, W: 300, H: t},
 		{X: 2400, Y: 1250, W: t, H: 150},
 	}
+}
+
+func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
+	if opts.BaseWaveSize < 10 {
+		opts.BaseWaveSize = 10
+	}
+	if opts.MaxWaveLevel < 1 {
+		opts.MaxWaveLevel = 1
+	}
+	if opts.MaxWaveLevel > 10 {
+		opts.MaxWaveLevel = 10
+	}
+	if opts.WavesLimit < 0 {
+		opts.WavesLimit = 0
+	}
+
+	spawnSize := SpawnZoneSize
+	playerX := WorldWidth/2 - PlayerSize/2
+	playerY := WorldHeight/2 - PlayerSize/2
+	if kind != MapDefault {
+		playerX = 700 - PlayerSize/2
+		playerY = 450 - PlayerSize/2
+	}
+
+	w := &World{
+		Player: Player{
+			X:         playerX,
+			Y:         playerY,
+			PrevX:     playerX,
+			PrevY:     playerY,
+			Weapon:    WeaponNone,
+			Secondary: WeaponNone,
+		},
+		Walls: wallsForMap(kind),
+		SpawnZone: geometry.Rect{
+			X: playerX - spawnSize/2 + PlayerSize/2,
+			Y: playerY - spawnSize/2 + PlayerSize/2,
+			W: spawnSize,
+			H: spawnSize,
+		},
+		Rng: rand.New(rand.NewSource(seed)),
+	}
+	w.NavGrid = buildNavGrid(w.Walls)
+	w.EnemyOccupancy = make([]bool, w.NavGrid.Cols*w.NavGrid.Rows)
+	w.SpatialHash = NewSpatialHash(WorldWidth, WorldHeight)
+
+	switch kind {
+	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic,
+		MapTestRammer, MapTestSniper, MapTestRocketeer:
+		w.Wave = WaveState{}
+	default:
+		w.Wave = WaveState{
+			Number:       0,
+			PauseTimer:   60,
+			BaseWaveSize: opts.BaseWaveSize,
+			MaxWaveLevel: opts.MaxWaveLevel,
+			WavesLimit:   opts.WavesLimit,
+		}
+	}
+	return w
 }

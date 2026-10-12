@@ -79,9 +79,19 @@ func (r *Renderer) DrawCircle(x, y, radius float64, c color.NRGBA) {
 
 var screenTextFace = text.NewGoXFace(basicfont.Face7x13)
 
+// DrawScreenText — цветной текст в экранных координатах.
 func (r *Renderer) DrawScreenText(s string, x, y float64, c color.NRGBA) {
 	op := &text.DrawOptions{}
-	op.GeoM.Translate(x, y)
+	op.GeoM.Translate(x, y+13) // +13 = ascent для basicfont.Face7x13
+	op.ColorScale.ScaleWithColor(c)
+	text.Draw(r.screen, s, screenTextFace, op)
+}
+
+func (r *Renderer) DrawScreenTextScaled(s string, x, y, scale float64, c color.NRGBA) {
+	op := &text.DrawOptions{}
+	m := screenTextFace.Metrics()
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(x, y+float64(m.HAscent)*scale)
 	op.ColorScale.ScaleWithColor(c)
 	text.Draw(r.screen, s, screenTextFace, op)
 }

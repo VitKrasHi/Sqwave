@@ -13,6 +13,10 @@ func StepWaves(w *world.World) {
 	ws := &w.Wave
 
 	if !ws.Active {
+		// Не-бесконечный режим: прошли все волны.
+		if ws.WavesLimit > 0 && ws.Number >= ws.WavesLimit {
+			return
+		}
 		if ws.PauseTimer > 0 {
 			ws.PauseTimer--
 			return
@@ -21,7 +25,7 @@ func StepWaves(w *world.World) {
 		return
 	}
 
-	// Спавн текущей группы ещё не закончен.
+	// Спавн группы.
 	if ws.GroupRemaining > 0 {
 		if ws.GroupSpawnTimer > 0 {
 			ws.GroupSpawnTimer--
@@ -39,22 +43,31 @@ func StepWaves(w *world.World) {
 
 	recomputeKilled(w, ws)
 
-	// Пул кончился? Спавнить больше нечего.
-	if ws.SpawnedCount >= ws.WaveSize {
-		ws.Active = false
-		ws.PauseTimer = wavePauseTicks
+	// Есть ещё группы в текущей волне?
+	if ws.GroupsRemaining > 0 && ws.SpawnedCount < ws.WaveSize {
+		startGroup(w)
 		return
 	}
 
-	startGroup(w)
+	// Волна завершена.
+	ws.Active = false
+	ws.PauseTimer = wavePauseTicks
 }
 
 func startWave(w *world.World) {
 	ws := &w.Wave
 	ws.Number++
-	ws.WaveSize = world.WaveSizeFor(ws.Number, w.Rng)
-
+	ws.WaveSize = world.WaveSizeFor(ws.Number, ws.BaseWaveSize, w.Rng)
 	ws.Composition = world.WaveComposition{}
+
+	// Уровень волны — случайный от 1 до MaxWaveLevel.
+	lvl := 1
+	if ws.MaxWaveLevel > 1 {
+		lvl = 1 + w.Rng.Intn(ws.MaxWaveLevel)
+	}
+	ws.WaveLevel = lvl
+	ws.GroupsTotal = lvl
+	ws.GroupsRemaining = lvl
 
 	ws.SpawnedCount = 0
 	ws.KilledCount = 0
@@ -69,15 +82,33 @@ func startGroup(w *world.World) {
 	ws := &w.Wave
 
 	remaining := ws.WaveSize - ws.SpawnedCount
-	if remaining <= 0 {
+	if remaining <= 0 || ws.GroupsRemaining <= 0 {
+		ws.GroupRemaining = 0
+		ws.GroupsRemaining = 0
 		return
 	}
 
-	size := 5 + w.Rng.Intn(26)
+	// Размер группы: делим остаток врагов на остаток групп.
+	base := remaining / ws.GroupsRemaining
+	if base < 3 {
+		base = 3
+	}
+	noise := base / 4
+	if noise < 1 {
+		noise = 1
+	}
+	size := base + w.Rng.Intn(noise*2+1) - noise
+	if size < 3 {
+		size = 3
+	}
 	if size > remaining {
 		size = remaining
 	}
+	if size > 40 {
+		size = 40
+	}
 
+	ws.GroupsRemaining--
 	ws.GroupID++
 	ws.GroupRemaining = size
 	ws.GroupSpawnTimer = 0
@@ -88,12 +119,10 @@ func startGroup(w *world.World) {
 func spawnOneFromGroup(w *world.World) {
 	ws := &w.Wave
 
-	// Равновероятный выбор типа.
 	t := world.RandomEnemyType(w.Rng)
 
 	pos, ok := findFreeSpotNear(w, ws.GroupOriginX, ws.GroupOriginY, 120)
 	if !ok {
-		// Не нашли точку — не тратим слот, повторим на следующем тике.
 		ws.GroupSpawnTimer = 3
 		return
 	}
@@ -102,7 +131,6 @@ func spawnOneFromGroup(w *world.World) {
 	e.GroupID = ws.GroupID
 	w.Enemies = append(w.Enemies, e)
 
-	// Обновляем оценочный состав для HUD.
 	switch t {
 	case world.EnemyInfantry:
 		ws.Composition.Infantry++
@@ -124,6 +152,7 @@ func spawnOneFromGroup(w *world.World) {
 	ws.SpawnedCount++
 }
 
+// pickGroupOrigin и остальные хелперы — как были.
 func pickGroupOrigin(w *world.World) (float64, float64) {
 	pcx, pcy := w.Player.Center()
 
@@ -227,7 +256,6 @@ func recomputeKilled(w *world.World, ws *world.WaveState) {
 	}
 }
 
-// StartTestRoom — заполняет мир врагами одного типа для теста.
 func StartTestRoom(w *world.World, kind world.MapKind) {
 	var t world.EnemyType
 	switch kind {
@@ -253,22 +281,5 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 	}
 	for _, p := range points {
 		w.Enemies = append(w.Enemies, world.NewEnemy(t, p.x, p.y))
-	}
-}
-
-func returnTypeToPool(ws *world.WaveState, t world.EnemyType) {
-	switch t {
-	case world.EnemyInfantry:
-		ws.PoolInfantry++
-	case world.EnemyShooter:
-		ws.PoolShooter++
-	case world.EnemyScout:
-		ws.PoolScout++
-	case world.EnemyMedic:
-		ws.PoolMedic++
-	case world.EnemyRammer:
-		ws.PoolRammer++
-	case world.EnemySniper:
-		ws.PoolSniper++
 	}
 }
