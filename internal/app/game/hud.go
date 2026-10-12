@@ -36,6 +36,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Sniper > 0 {
 		lines = append(lines, line{"Sniper", comp.Sniper, ColorSniper})
 	}
+	if comp.Rocketeer > 0 {
+		lines = append(lines, line{"Rocketeer", comp.Rocketeer, ColorRocketeer})
+	}
 
 	const (
 		panelW  = 260.0

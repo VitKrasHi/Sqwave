@@ -3,16 +3,17 @@ package world
 import "Sqwave/internal/domain/geometry"
 
 type WaveComposition struct {
-	Infantry int
-	Shooter  int
-	Scout    int
-	Medic    int
-	Rammer   int
-	Sniper   int
+	Infantry  int
+	Shooter   int
+	Scout     int
+	Medic     int
+	Rammer    int
+	Sniper    int
+	Rocketeer int
 }
 
 func (c WaveComposition) Total() int {
-	return c.Infantry + c.Shooter + c.Scout + c.Medic + c.Rammer + c.Sniper
+	return c.Infantry + c.Shooter + c.Scout + c.Medic + c.Rammer + c.Sniper + c.Rocketeer
 }
 
 type WaveState struct {
@@ -64,7 +65,7 @@ func WaveSizeFor(n int, rng intRng) int {
 }
 
 func RandomEnemyType(rng intRng) EnemyType {
-	switch rng.Intn(6) {
+	switch rng.Intn(7) {
 	case 0:
 		return EnemyInfantry
 	case 1:
@@ -75,8 +76,10 @@ func RandomEnemyType(rng intRng) EnemyType {
 		return EnemyMedic
 	case 4:
 		return EnemyRammer
-	default:
+	case 5:
 		return EnemySniper
+	default:
+		return EnemyRocketeer
 	}
 }
 

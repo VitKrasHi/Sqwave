@@ -100,6 +100,8 @@ func StepEnemies(w *world.World) {
 			stepRammer(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemySniper:
 			stepSniper(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyRocketeer:
+			stepRocketeer(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 

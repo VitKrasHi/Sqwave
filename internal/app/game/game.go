@@ -50,6 +50,11 @@ func (g *Game) Update() error {
 		g.debugNav = !g.debugNav
 	}
 
+	// F11 — переключить полноэкранный режим.
+	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
 	in := g.input.Poll()
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y
@@ -83,6 +88,7 @@ func (g *Game) Update() error {
 	systems.StepEnemies(g.world)
 	systems.StepMedicHeal(g.world)
 	systems.StepEnemyProjectiles(g.world)
+	systems.StepEnemyRockets(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -137,6 +143,17 @@ func (g *Game) Draw(r SceneRenderer) {
 
 	for _, proj := range w.EnemyProjectiles {
 		r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
+	}
+
+	// Ракеты: хвост + голова.
+	for _, rk := range w.EnemyRockets {
+		l := math.Hypot(rk.VX, rk.VY)
+		if l > 0.01 {
+			tailX := rk.X - rk.VX/l*14
+			tailY := rk.Y - rk.VY/l*14
+			r.DrawLine(tailX, tailY, rk.X, rk.Y, 3, ColorEnemyRocketTrail)
+		}
+		r.DrawRect(rk.X-rk.Size/2, rk.Y-rk.Size/2, rk.Size, rk.Size, ColorEnemyRocket)
 	}
 
 	if g.debugNav {
@@ -404,6 +421,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			}
 		case world.EnemySniper:
 			c = ColorSniper
+		case world.EnemyRocketeer:
+			c = ColorRocketeer
 		default:
 			c = ColorEnemy
 		}

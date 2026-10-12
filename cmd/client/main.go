@@ -29,7 +29,8 @@ func (a *adapter) Layout(_, _ int) (int, int) {
 }
 
 func main() {
-	mapName := flag.String("map", "default", "map: default|infantry|shooter|scout")
+	mapName := flag.String("map", "default", "map: default|infantry|shooter|scout|medic|rammer|sniper|rocketeer")
+	fullscreen := flag.Bool("fullscreen", false, "start in fullscreen")
 	profiler := flag.Bool("prof", false, "enable pprof on localhost:6060")
 	flag.Parse()
 
@@ -56,12 +57,13 @@ func main() {
 		kind = world.MapTestRammer
 	case "sniper":
 		kind = world.MapTestSniper
+	case "rocketeer":
+		kind = world.MapTestRocketeer
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}
 
 	w := world.NewWithMap(0, kind)
-
 	if kind != world.MapDefault {
 		systems.StartTestRoom(w, kind)
 	}
@@ -71,6 +73,10 @@ func main() {
 	ebiten.SetWindowSize(world.ScreenWidth, world.ScreenHeight)
 	ebiten.SetWindowTitle("Sqwave — " + *mapName)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+
+	if *fullscreen {
+		ebiten.SetFullscreen(true)
+	}
 
 	if err := ebiten.RunGame(&adapter{g: g}); err != nil {
 		panic(err)

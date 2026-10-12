@@ -14,6 +14,7 @@ type World struct {
 	Rockets          []Rocket
 	Explosions       []Explosion
 	EnemyProjectiles []EnemyProjectile
+	EnemyRockets     []EnemyRocket
 	Walls            []geometry.Rect
 	SpawnZone        geometry.Rect
 	Rng              *rand.Rand
@@ -33,6 +34,7 @@ const (
 	MapTestMedic
 	MapTestRammer
 	MapTestSniper
+	MapTestRocketeer
 )
 
 func New() *World {
@@ -113,7 +115,8 @@ func buildNavGrid(walls []geometry.Rect) *geometry.Grid {
 
 func wallsForMap(kind MapKind) []geometry.Rect {
 	switch kind {
-	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic, MapTestRammer:
+	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic,
+		MapTestRammer, MapTestSniper, MapTestRocketeer:
 		return testRoomWalls()
 	default:
 		return defaultWalls()

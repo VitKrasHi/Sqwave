@@ -116,6 +116,8 @@ func spawnOneFromGroup(w *world.World) {
 		ws.Composition.Rammer++
 	case world.EnemySniper:
 		ws.Composition.Sniper++
+	case world.EnemyRocketeer:
+		ws.Composition.Rocketeer++
 	}
 
 	ws.GroupRemaining--
@@ -241,6 +243,8 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemyRammer
 	case world.MapTestSniper:
 		t = world.EnemySniper
+	case world.MapTestRocketeer:
+		t = world.EnemyRocketeer
 	default:
 		return
 	}
