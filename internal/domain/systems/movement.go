@@ -9,6 +9,8 @@ import (
 
 func StepPlayer(w *world.World, in input.PlayerInput) {
 	p := &w.Player
+
+	// Прицел — можно целиться всегда.
 	if p.HasPrevAim {
 		dx := in.AimX - p.PrevAimX
 		dy := in.AimY - p.PrevAimY
@@ -19,10 +21,35 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	}
 	p.PrevAimX = in.AimX
 	p.PrevAimY = in.AimY
-
 	p.AimX = in.AimX
 	p.AimY = in.AimY
 	p.IsFiring = in.Fire
+
+	// Пересборка валидности HeldBy.
+	if p.Held {
+		valid := false
+		if p.HeldBy >= 0 && p.HeldBy < len(w.Enemies) {
+			other := &w.Enemies[p.HeldBy]
+			if !other.IsDead() && other.Latched {
+				valid = true
+			}
+		}
+		if !valid {
+			p.Held = false
+			p.HeldBy = -1
+		}
+	}
+
+	// ⚠️ Если в захвате — не двигаемся, выходим из функции.
+	// Сбрасываем VelX/VelY, чтобы снайпер не «видел» движение.
+	if p.Held {
+		p.DashTimer = 0
+		p.VelX = 0
+		p.VelY = 0
+		p.PrevX = p.X
+		p.PrevY = p.Y
+		return
+	}
 
 	if p.DashCooldownTimer > 0 {
 		p.DashCooldownTimer--

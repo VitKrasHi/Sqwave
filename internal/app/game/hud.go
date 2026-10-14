@@ -41,6 +41,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Buffer > 0 {
 		lines = append(lines, line{"Buffer", comp.Buffer, ColorBuffer})
 	}
+	if comp.Fleer > 0 {
+		lines = append(lines, line{"Fleer", comp.Fleer, ColorFleer})
+	}
 
 	const (
 		panelW  = 260.0
@@ -106,6 +109,11 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if ws.IsVictory() {
 		r.DrawScreenText("VICTORY!", panelX+12, y, ColorMenuSelected)
 		y += rowH
+	}
+
+	if w.Player.Held {
+		r.DrawScreenTextScaled("!! CAUGHT !!", 8, float64(world.ScreenHeight)-90, 2.0,
+			color.NRGBA{R: 255, G: 60, B: 80, A: 255})
 	}
 
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {

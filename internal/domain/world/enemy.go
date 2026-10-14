@@ -13,6 +13,7 @@ const (
 	EnemySniper
 	EnemyRocketeer
 	EnemyBuffer
+	EnemyFleer
 )
 
 type EnemyStats struct {
@@ -66,6 +67,12 @@ type EnemyStats struct {
 	BufferSpeedMul     float64
 	BufferDuration     int
 	BufferRefreshTicks int
+
+	// Беглец.
+	FleerTurnRate  float64 // радиан за тик, медленный поворот
+	FleerConeWidth float64 // полный угол конуса в градусах
+	FleerGrabRange float64 // радиус захвата
+	FleerLatchDmg  int     // урон в тик при захвате
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -178,6 +185,17 @@ var enemyStats = map[EnemyType]EnemyStats{
 		BufferDuration:     30,
 		BufferRefreshTicks: 6,
 	},
+	EnemyFleer: {
+		Name:           "Fleer",
+		MaxHP:          200,
+		SP:             200,
+		Size:           22,
+		MeleeRange:     55,    // дистанция захвата
+		FleerTurnRate:  0.035, // ~2° за тик, полный оборот ~3 сек
+		FleerConeWidth: 40,    // узкий конус (полный угол)
+		FleerGrabRange: 55,
+		FleerLatchDmg:  6, // HP за тик при захвате
+	},
 }
 
 const (
@@ -285,6 +303,10 @@ type Enemy struct {
 	BuffDamageMul float64
 	BuffSpeedMul  float64
 	BuffTimer     int
+
+	// Беглец.
+	AimAngle float64 // текущий угол взгляда, медленно вращается
+	Latched  bool    // сцепился с игроком
 
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).

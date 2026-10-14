@@ -37,6 +37,10 @@ type Player struct {
 	PrevX, PrevY float64
 	VelX, VelY   float64
 
+	// Захвачен беглецом.
+	Held   bool
+	HeldBy int
+
 	IsFiring bool
 }
 

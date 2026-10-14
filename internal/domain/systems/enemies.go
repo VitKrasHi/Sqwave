@@ -104,6 +104,8 @@ func StepEnemies(w *world.World) {
 			stepRocketeer(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyBuffer:
 			stepBuffer(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyFleer:
+			stepFleer(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 

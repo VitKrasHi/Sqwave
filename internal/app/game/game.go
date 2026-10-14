@@ -166,6 +166,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
+	drawFleerCones(r, w)
 	drawEnemies(r, w)
 
 	p := &w.Player
@@ -387,8 +388,8 @@ func drawSpawnZone(r SceneRenderer, w *world.World, ticks int) {
 }
 
 func formatLoadout(p *world.Player) string {
-	a := "—"
-	b := "—"
+	a := "-"
+	b := "-"
 	if p.Weapon != world.WeaponNone {
 		a = p.Weapon.Stats().Name
 	}
@@ -429,6 +430,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorRocketeer
 		case world.EnemyBuffer:
 			c = ColorBuffer
+		case world.EnemyFleer:
+			c = ColorFleer
 		default:
 			c = ColorEnemy
 		}
@@ -448,6 +451,15 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			tailX := cx - e.DashDirX*trailLen
 			tailY := cy - e.DashDirY*trailLen
 			r.DrawLine(cx, cy, tailX, tailY, 8, ColorRammerDash)
+		}
+
+		if e.Type == world.EnemyFleer && e.Latched {
+			cx, cy := e.Center()
+			pcx, pcy := w.Player.Center()
+			ang := math.Atan2(pcy-cy, pcx-cx)
+			bx := cx + math.Cos(ang)*18
+			by := cy + math.Sin(ang)*18
+			r.DrawLine(cx, cy, bx, by, 5, ColorFleerBlade)
 		}
 
 		// Взгляд — короткий штрих из центра.
@@ -627,5 +639,38 @@ func drawBufferBeams(r SceneRenderer, w *world.World) {
 			tcx, tcy := t.Center()
 			r.DrawLine(ecx, ecy, tcx, tcy, thickness, ColorBufferBeam)
 		}
+	}
+}
+
+func drawFleerCones(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() || e.Type != world.EnemyFleer {
+			continue
+		}
+		if e.Latched {
+			continue // в захвате конус не нужен
+		}
+
+		stats := e.Type.Stats()
+		ecx, ecy := e.Center()
+		halfCone := stats.FleerConeWidth * math.Pi / 360
+		reach := stats.FleerGrabRange
+
+		// Рисуем конус двумя отрезками из центра.
+		a1 := e.AimAngle - halfCone
+		a2 := e.AimAngle + halfCone
+		x1 := ecx + math.Cos(a1)*reach
+		y1 := ecy + math.Sin(a1)*reach
+		x2 := ecx + math.Cos(a2)*reach
+		y2 := ecy + math.Sin(a2)*reach
+
+		r.DrawLine(ecx, ecy, x1, y1, 1.5, ColorFleerCone)
+		r.DrawLine(ecx, ecy, x2, y2, 1.5, ColorFleerCone)
+
+		// Направление взгляда — яркая линия.
+		ax := ecx + math.Cos(e.AimAngle)*reach
+		ay := ecy + math.Sin(e.AimAngle)*reach
+		r.DrawLine(ecx, ecy, ax, ay, 2, ColorFleerAim)
 	}
 }

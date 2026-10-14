@@ -42,6 +42,7 @@ const (
 	MapTestSniper
 	MapTestRocketeer
 	MapTestBuffer
+	MapTestFleer
 )
 
 func New() *World {
@@ -223,6 +224,7 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 			PrevY:     playerY,
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
+			HeldBy:    -1,
 		},
 		Walls: wallsForMap(kind),
 		SpawnZone: geometry.Rect{

@@ -87,6 +87,11 @@ var (
 
 	ColorBuffer     = color.NRGBA{R: 220, G: 200, B: 100, A: 255}
 	ColorBufferBeam = color.NRGBA{R: 255, G: 220, B: 120, A: 200}
+
+	ColorFleer      = color.NRGBA{R: 80, G: 220, B: 200, A: 255}
+	ColorFleerBlade = color.NRGBA{R: 255, G: 80, B: 120, A: 255}
+	ColorFleerCone  = color.NRGBA{R: 80, G: 220, B: 200, A: 60}
+	ColorFleerAim   = color.NRGBA{R: 80, G: 220, B: 200, A: 140}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {
