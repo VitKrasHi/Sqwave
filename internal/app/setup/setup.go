@@ -9,6 +9,7 @@ import (
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/particles"
 	"Sqwave/internal/domain/world"
+	"Sqwave/internal/infra/audio"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -57,9 +58,11 @@ type Scene struct {
 	repeatDelay int
 	repeatRate  int
 	heldDir     int
+
+	music *audio.Player
 }
 
-func New(onStart func(Settings), onBack func()) *Scene {
+func New(music *audio.Player, onStart func(Settings), onBack func()) *Scene {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	s := &Scene{
 		settings: Settings{
@@ -69,6 +72,7 @@ func New(onStart func(Settings), onBack func()) *Scene {
 		},
 		onStart: onStart,
 		onBack:  onBack,
+		music:   music,
 	}
 	s.ps = particles.New(40, float64(world.ScreenWidth)-40,
 		40, float64(world.ScreenHeight)-40, rng)
@@ -100,6 +104,10 @@ func panelOrigin() (float64, float64) {
 }
 
 func (s *Scene) Update() error {
+	if s.music != nil {
+		_ = s.music.PlayLoop("assets/music/nfx.wav")
+	}
+
 	particles.Update(s.ps, 40, float64(world.ScreenWidth)-40,
 		40, float64(world.ScreenHeight)-40)
 

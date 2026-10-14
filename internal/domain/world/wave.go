@@ -17,6 +17,13 @@ func (c WaveComposition) Total() int {
 		c.Rammer + c.Sniper + c.Rocketeer
 }
 
+type WaveKind int
+
+const (
+	WaveKindCommon WaveKind = iota
+	WaveKindTimer
+)
+
 type WaveState struct {
 	Number int
 
@@ -33,21 +40,27 @@ type WaveState struct {
 
 	WaveSize int
 
-	// Уровни волн.
-	MaxWaveLevel    int // из настроек, 1..10
-	WaveLevel       int // текущий уровень (1..MaxWaveLevel)
-	GroupsTotal     int // сколько групп в текущей волне
-	GroupsRemaining int // сколько групп ещё не запущено
+	// Common-волна.
+	MaxWaveLevel    int
+	WaveLevel       int
+	GroupsTotal     int
+	GroupsRemaining int
 
-	// Базовые параметры из настроек.
-	BaseWaveSize int // базовое количество врагов за волну
-	WavesLimit   int // 0 = бесконечные
+	// Настройки.
+	BaseWaveSize int
+	WavesLimit   int
+
+	// Тип волны.
+	Kind WaveKind
+
+	// Timer-волна.
+	TimerTotal     int // всего тиков
+	TimerRemaining int // осталось тиков
 
 	PauseTimer int
 	Active     bool
 }
 
-// IsVictory — все волны пройдены в не-бесконечном режиме.
 func (ws *WaveState) IsVictory() bool {
 	return ws.WavesLimit > 0 && ws.Number >= ws.WavesLimit && !ws.Active
 }
@@ -93,6 +106,37 @@ func RandomEnemyType(rng intRng) EnemyType {
 	default:
 		return EnemyRocketeer
 	}
+}
+
+// RandomEnemyTypeTimer — выбор типа врага для timer-волны.
+// Чем больше progress (0..1), тем шире пул типов: от Infantry/Shooter
+// до всех семи.
+func RandomEnemyTypeTimer(progress float64, rng intRng) EnemyType {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+
+	pool := []EnemyType{EnemyInfantry, EnemyShooter}
+	if progress > 0.15 {
+		pool = append(pool, EnemyScout)
+	}
+	if progress > 0.30 {
+		pool = append(pool, EnemyMedic)
+	}
+	if progress > 0.45 {
+		pool = append(pool, EnemyRammer)
+	}
+	if progress > 0.60 {
+		pool = append(pool, EnemySniper)
+	}
+	if progress > 0.75 {
+		pool = append(pool, EnemyRocketeer)
+	}
+
+	return pool[rng.Intn(len(pool))]
 }
 
 // SpawnPoints — базовые точки для выбора центра группы.

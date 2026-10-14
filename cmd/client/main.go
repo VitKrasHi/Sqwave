@@ -18,6 +18,7 @@ import (
 	"Sqwave/internal/app/setup"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
+	"Sqwave/internal/infra/audio"
 	"Sqwave/internal/infra/ebiteninput"
 	"Sqwave/internal/infra/ebitenrender"
 )
@@ -25,6 +26,7 @@ import (
 type App struct {
 	current app.Scene
 	mapKind world.MapKind
+	music   *audio.Player
 }
 
 func (a *App) Update() error {
@@ -49,6 +51,7 @@ func (a *App) Layout(_, _ int) (int, int) {
 
 func (a *App) openMenu() {
 	a.current = menu.New(
+		a.music,
 		func() { a.openSetup() },
 		func() { os.Exit(0) },
 	)
@@ -56,6 +59,7 @@ func (a *App) openMenu() {
 
 func (a *App) openSetup() {
 	a.current = setup.New(
+		a.music,
 		func(s setup.Settings) { a.startGame(s) },
 		func() { a.openMenu() },
 	)
@@ -70,7 +74,7 @@ func (a *App) startGame(s setup.Settings) {
 	if a.mapKind != world.MapDefault {
 		systems.StartTestRoom(w, a.mapKind)
 	}
-	a.current = game.New(w, ebiteninput.New())
+	a.current = game.New(w, ebiteninput.New(), a.music)
 }
 
 func main() {
@@ -109,7 +113,12 @@ func main() {
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}
 
-	a := &App{mapKind: kind}
+	music, err := audio.New()
+	if err != nil {
+		fmt.Println("audio init failed:", err)
+	}
+
+	a := &App{mapKind: kind, music: music}
 
 	if *skipMenu {
 		a.startGame(setup.Settings{

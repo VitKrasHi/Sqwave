@@ -3,14 +3,20 @@ package world
 import "Sqwave/internal/domain/geometry"
 
 // EnemyRocket — снаряд ракетчика. Летит в направлении VX/VY,
-// но каждый тик слегка доворачивает скорость к игроку (homing).
+// каждый тик слегка доворачивает скорость к игроку (homing).
+// При столкновении с чем угодно или по истечении Life создаёт
+// взрыв (world.Explosion) и наносит AoE-урон игроку.
 type EnemyRocket struct {
-	X, Y       float64
-	VX, VY     float64
-	Size       float64
-	Life       int
-	MaxLife    int
-	Damage     int
+	X, Y    float64
+	VX, VY  float64
+	Size    float64
+	Life    int
+	MaxLife int
+
+	ExplosionDamage int
+	ExplosionRadius float64
+	ExplosionLife   int
+
 	HomingRate float64
 }
 

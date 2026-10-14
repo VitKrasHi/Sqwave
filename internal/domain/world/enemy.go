@@ -48,13 +48,15 @@ type EnemyStats struct {
 	SniperDamageMax   int
 
 	// Ракетчик.
-	RocketSpeed      float64
-	RocketHomingRate float64 // доля отклонения к игроку за тик (0.02..0.05)
-	RocketLife       int
-	RocketDamage     int
-	RocketFireRange  float64
-	RocketCooldown   int
-	RocketSize       float64
+	RocketSpeed           float64
+	RocketHomingRate      float64
+	RocketLife            int
+	RocketExplosionDamage int
+	RocketExplosionRadius float64
+	RocketExplosionLife   int
+	RocketFireRange       float64
+	RocketCooldown        int
+	RocketSize            float64
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -139,17 +141,19 @@ var enemyStats = map[EnemyType]EnemyStats{
 		SniperDamageMax:   200,
 	},
 	EnemyRocketeer: {
-		Name:             "Rocketeer",
-		MaxHP:            300,
-		SP:               70,
-		Size:             26,
-		RocketSpeed:      5.5,
-		RocketHomingRate: 0.03,
-		RocketLife:       240,
-		RocketDamage:     80,
-		RocketFireRange:  420,
-		RocketCooldown:   150,
-		RocketSize:       10,
+		Name:                  "Rocketeer",
+		MaxHP:                 300,
+		SP:                    70,
+		Size:                  26,
+		RocketSpeed:           5.5,
+		RocketHomingRate:      0.04,
+		RocketLife:            180, // меньше — ракета взрывается быстрее
+		RocketExplosionDamage: 50,
+		RocketExplosionRadius: 120,
+		RocketExplosionLife:   14,
+		RocketFireRange:       420,
+		RocketCooldown:        150,
+		RocketSize:            10,
 	},
 }
 
@@ -252,6 +256,9 @@ type Enemy struct {
 	RocketFireTimer int
 
 	GroupID int
+	// Множители сложности (для timer wave). 0 = 1.0 (база).
+	HPMultiplier    float64
+	SpeedMultiplier float64
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {

@@ -9,6 +9,7 @@ import (
 	"Sqwave/internal/domain/input"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
+	"Sqwave/internal/infra/audio"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -23,16 +24,23 @@ type Game struct {
 	menu   Menu
 
 	lastInput input.PlayerInput
-	ticks     int // для анимаций представления
+	ticks     int
 
 	debugNav bool
+
+	music *audio.Player
 }
 
-func New(w *world.World, in InputSource) *Game {
+func New(w *world.World, in InputSource, music *audio.Player) *Game {
+	if music != nil {
+		music.Stop()
+	}
+
 	g := &Game{
 		world:  w,
 		input:  in,
 		camera: NewCamera(),
+		music:  music,
 	}
 	cx, cy := w.Player.Center()
 	g.camera.Follow(cx, cy, cx, cy, 0)

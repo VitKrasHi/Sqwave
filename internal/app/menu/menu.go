@@ -8,6 +8,7 @@ import (
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/particles"
 	"Sqwave/internal/domain/world"
+	"Sqwave/internal/infra/audio"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -22,12 +23,15 @@ type Menu struct {
 	buttons  []*Button
 	selected int
 	ps       []particles.Particle
+
+	music *audio.Player
 }
 
-func New(onStart, onExit func()) *Menu {
+func New(music *audio.Player, onStart, onExit func()) *Menu {
 	m := &Menu{
 		onStart: onStart,
 		onExit:  onExit,
+		music:   music,
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	m.buildButtons()
@@ -51,6 +55,10 @@ func (m *Menu) buildButtons() {
 }
 
 func (m *Menu) Update() error {
+	if m.music != nil {
+		_ = m.music.PlayLoop("assets/music/nfx.wav")
+	}
+
 	particles.Update(m.ps, panelW+20, float64(world.ScreenWidth)-20,
 		20, float64(world.ScreenHeight)-20)
 

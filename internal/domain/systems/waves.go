@@ -13,7 +13,6 @@ func StepWaves(w *world.World) {
 	ws := &w.Wave
 
 	if !ws.Active {
-		// Не-бесконечный режим: прошли все волны.
 		if ws.WavesLimit > 0 && ws.Number >= ws.WavesLimit {
 			return
 		}
@@ -25,7 +24,19 @@ func StepWaves(w *world.World) {
 		return
 	}
 
-	// Спавн группы.
+	if ws.Kind == world.WaveKindTimer {
+		stepTimerWave(w)
+		return
+	}
+
+	stepCommonWave(w)
+}
+
+// ---------- Common ----------
+
+func stepCommonWave(w *world.World) {
+	ws := &w.Wave
+
 	if ws.GroupRemaining > 0 {
 		if ws.GroupSpawnTimer > 0 {
 			ws.GroupSpawnTimer--
@@ -36,31 +47,159 @@ func StepWaves(w *world.World) {
 		return
 	}
 
-	// Группа выпущена. Ждём её смерти.
 	if groupAlive(w, ws.GroupID) {
 		return
 	}
 
 	recomputeKilled(w, ws)
 
-	// Есть ещё группы в текущей волне?
-	if ws.GroupsRemaining > 0 && ws.SpawnedCount < ws.WaveSize {
-		startGroup(w)
+	if ws.SpawnedCount >= ws.WaveSize {
+		ws.Active = false
+		ws.PauseTimer = wavePauseTicks
 		return
 	}
 
-	// Волна завершена.
-	ws.Active = false
-	ws.PauseTimer = wavePauseTicks
+	startGroup(w)
 }
+
+// ---------- Timer ----------
+
+func stepTimerWave(w *world.World) {
+	ws := &w.Wave
+
+	// Таймер истёк — все враги умирают.
+	if ws.TimerRemaining <= 0 {
+		for i := range w.Enemies {
+			if w.Enemies[i].GroupID > 0 {
+				w.Enemies[i].HP = 0
+			}
+		}
+		ws.Active = false
+		ws.PauseTimer = wavePauseTicks
+		return
+	}
+
+	ws.TimerRemaining--
+
+	// Спавн текущей группы.
+	if ws.GroupRemaining > 0 {
+		if ws.GroupSpawnTimer > 0 {
+			ws.GroupSpawnTimer--
+			return
+		}
+		spawnTimerGroupMember(w)
+		ws.GroupSpawnTimer = 3
+		return
+	}
+
+	// Пауза перед следующей группой.
+	if ws.GroupSpawnTimer > 0 {
+		ws.GroupSpawnTimer--
+		return
+	}
+
+	startTimerGroup(w)
+}
+
+func timerProgress(ws *world.WaveState) float64 {
+	if ws.TimerTotal <= 0 {
+		return 0
+	}
+	elapsed := ws.TimerTotal - ws.TimerRemaining
+	p := float64(elapsed) / float64(ws.TimerTotal)
+	if p < 0 {
+		p = 0
+	}
+	if p > 1 {
+		p = 1
+	}
+	return p
+}
+
+func startTimerGroup(w *world.World) {
+	ws := &w.Wave
+
+	// Размер группы: 4..10, к концу чуть крупнее.
+	progress := timerProgress(ws)
+	base := 4 + int(progress*4)  // 4..8
+	size := base + w.Rng.Intn(4) // +0..3
+
+	ws.GroupID++
+	ws.GroupRemaining = size
+	ws.GroupSpawnTimer = 0
+
+	ws.GroupOriginX, ws.GroupOriginY = pickGroupOrigin(w)
+
+	// Интервал до следующей группы: от 5 сек до 1.5 сек.
+	interval := 300 - int(progress*210) // 300..90
+	ws.GroupSpawnTimer = interval
+}
+
+func spawnTimerGroupMember(w *world.World) {
+	ws := &w.Wave
+
+	progress := timerProgress(ws)
+	t := world.RandomEnemyTypeTimer(progress, w.Rng)
+
+	pos, ok := findFreeSpotNear(w, ws.GroupOriginX, ws.GroupOriginY, 120)
+	if !ok {
+		ws.GroupSpawnTimer = 3
+		return
+	}
+
+	e := world.NewEnemy(t, pos.X, pos.Y)
+	e.GroupID = ws.GroupID
+	w.Enemies = append(w.Enemies, e)
+
+	switch t {
+	case world.EnemyInfantry:
+		ws.Composition.Infantry++
+	case world.EnemyShooter:
+		ws.Composition.Shooter++
+	case world.EnemyScout:
+		ws.Composition.Scout++
+	case world.EnemyMedic:
+		ws.Composition.Medic++
+	case world.EnemyRammer:
+		ws.Composition.Rammer++
+	case world.EnemySniper:
+		ws.Composition.Sniper++
+	case world.EnemyRocketeer:
+		ws.Composition.Rocketeer++
+	}
+
+	ws.GroupRemaining--
+	ws.SpawnedCount++
+}
+
+// ---------- Общее ----------
 
 func startWave(w *world.World) {
 	ws := &w.Wave
 	ws.Number++
-	ws.WaveSize = world.WaveSizeFor(ws.Number, ws.BaseWaveSize, w.Rng)
 	ws.Composition = world.WaveComposition{}
 
-	// Уровень волны — случайный от 1 до MaxWaveLevel.
+	// Рандомно: 50/50 common или timer.
+	if w.Rng.Intn(2) == 0 {
+		startCommonWave(w)
+	} else {
+		startTimerWave(w)
+	}
+
+	ws.SpawnedCount = 0
+	ws.KilledCount = 0
+	ws.Active = true
+	ws.GroupRemaining = 0
+	ws.GroupSpawnTimer = 0
+}
+
+func startCommonWave(w *world.World) {
+	ws := &w.Wave
+	ws.Kind = world.WaveKindCommon
+	ws.WaveSize = world.WaveSizeFor(ws.Number, ws.BaseWaveSize, w.Rng)
+	ws.TimerTotal = 0
+	ws.TimerRemaining = 0
+
 	lvl := 1
 	if ws.MaxWaveLevel > 1 {
 		lvl = 1 + w.Rng.Intn(ws.MaxWaveLevel)
@@ -69,13 +208,23 @@ func startWave(w *world.World) {
 	ws.GroupsTotal = lvl
 	ws.GroupsRemaining = lvl
 
-	ws.SpawnedCount = 0
-	ws.KilledCount = 0
-	ws.Active = true
-	ws.GroupRemaining = 0
-	ws.GroupSpawnTimer = 0
-
 	startGroup(w)
+}
+
+func startTimerWave(w *world.World) {
+	ws := &w.Wave
+	ws.Kind = world.WaveKindTimer
+	ws.WaveSize = 0
+	ws.WaveLevel = 0
+	ws.GroupsTotal = 0
+	ws.GroupsRemaining = 0
+
+	// 3..5 минут при 60 TPS.
+	minutes := 3 + w.Rng.Intn(3)
+	ws.TimerTotal = minutes * 60 * 60
+	ws.TimerRemaining = ws.TimerTotal
+
+	startTimerGroup(w)
 }
 
 func startGroup(w *world.World) {
@@ -88,7 +237,6 @@ func startGroup(w *world.World) {
 		return
 	}
 
-	// Размер группы: делим остаток врагов на остаток групп.
 	base := remaining / ws.GroupsRemaining
 	if base < 3 {
 		base = 3
@@ -152,7 +300,6 @@ func spawnOneFromGroup(w *world.World) {
 	ws.SpawnedCount++
 }
 
-// pickGroupOrigin и остальные хелперы — как были.
 func pickGroupOrigin(w *world.World) (float64, float64) {
 	pcx, pcy := w.Player.Center()
 

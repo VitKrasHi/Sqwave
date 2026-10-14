@@ -51,13 +51,12 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	panelX := float64(world.ScreenWidth) - panelW - 12
 	panelY := 12.0
 
-	// Сколько строк в header + level + состав + прогресс.
-	headerLines := 1 // заголовок Wave N/M
+	headerLines := 1
 	if ws.Number > 0 {
-		headerLines++ // строка Level
+		headerLines++
 	}
 	progressLines := 3
-	if ws.GroupRemaining > 0 {
+	if ws.GroupRemaining > 0 || ws.Kind == world.WaveKindTimer {
 		progressLines++
 	}
 	panelH := headerH +
@@ -69,46 +68,49 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	r.DrawScreenRect(panelX-2, panelY-2, panelW+4, panelH+4, ColorMenuBorder)
 	r.DrawScreenRect(panelX, panelY, panelW, panelH, ColorMenuPanel)
 
-	// Заголовок.
-	title := "Wave —"
+	title := "Wave -"
 	if ws.Number > 0 {
 		if ws.WavesLimit > 0 {
 			title = fmt.Sprintf("Wave %d / %d", ws.Number, ws.WavesLimit)
 		} else {
-			title = fmt.Sprintf("Wave %d / ∞", ws.Number)
+			title = fmt.Sprintf("Wave %d / infinity", ws.Number)
 		}
 	}
 	r.DrawScreenText(title, panelX+12, panelY+topPad, ColorMenuSelected)
 
 	y := panelY + headerH
 
-	// Строка уровня.
+	// Строка типа волны / таймера.
 	if ws.Number > 0 {
-		r.DrawScreenText(fmt.Sprintf("Level %d / %d", ws.WaveLevel, ws.MaxWaveLevel),
-			panelX+12, y, ColorMenuText)
+		if ws.Kind == world.WaveKindTimer {
+			sec := ws.TimerRemaining / 60
+			min := sec / 60
+			sec = sec % 60
+			text := fmt.Sprintf("TIMER %02d:%02d", min, sec)
+			r.DrawScreenText(text, panelX+12, y, ColorMenuSelected)
+		} else {
+			r.DrawScreenText(fmt.Sprintf("Level %d / %d", ws.WaveLevel, ws.MaxWaveLevel),
+				panelX+12, y, ColorMenuText)
+		}
 		y += rowH
 	}
 
-	// Старт.
 	if !ws.Active && ws.Number == 0 {
 		r.DrawScreenText("Starting...", panelX+12, y, ColorMenuText)
 		return
 	}
 
-	// Победа.
 	if ws.IsVictory() {
 		r.DrawScreenText("VICTORY!", panelX+12, y, ColorMenuSelected)
 		y += rowH
 	}
 
-	// Пауза между волнами.
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {
 		sec := ws.PauseTimer / 60
 		r.DrawScreenText(fmt.Sprintf("Next wave in %ds", sec), panelX+12, y, ColorMenuText)
 		y += rowH
 	}
 
-	// Состав.
 	for _, l := range lines {
 		label := fmt.Sprintf("%-9s x%d", l.label, l.count)
 		r.DrawScreenText(label, panelX+12, y, l.c)
@@ -118,9 +120,19 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	y += 4
 
 	// Прогресс.
-	r.DrawScreenText(fmt.Sprintf("Spawned: %d / %d", ws.SpawnedCount, comp.Total()),
-		panelX+12, y, ColorMenuText)
-	y += slotH
+	if ws.Kind == world.WaveKindTimer {
+		progress := 0.0
+		if ws.TimerTotal > 0 {
+			progress = 1 - float64(ws.TimerRemaining)/float64(ws.TimerTotal)
+		}
+		r.DrawScreenText(fmt.Sprintf("Difficulty: %d%%", int(progress*100)),
+			panelX+12, y, ColorMenuText)
+		y += slotH
+	} else {
+		r.DrawScreenText(fmt.Sprintf("Spawned: %d / %d", ws.SpawnedCount, ws.WaveSize),
+			panelX+12, y, ColorMenuText)
+		y += slotH
+	}
 
 	r.DrawScreenText(fmt.Sprintf("Killed: %d", ws.KilledCount),
 		panelX+12, y, ColorMenuText)
@@ -139,7 +151,7 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if ws.GroupRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Group: %d left", ws.GroupRemaining),
 			panelX+12, y, ColorMenuDim)
-	} else if ws.GroupsRemaining > 0 {
+	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Groups left: %d", ws.GroupsRemaining),
 			panelX+12, y, ColorMenuDim)
 	}
