@@ -60,7 +60,8 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 		// Проверка попадания по игроку — урон один раз за рывок,
 		// но рывок НЕ прерывается.
 		if !e.DashHit && rammerHitsPlayer(e, &w.Player) {
-			w.Player.TakeDamage(stats.DashDamage)
+			dmg := int(float64(stats.DashDamage) * e.DamageMul())
+			w.Player.TakeDamage(dmg)
 			e.DashHit = true
 		}
 
@@ -82,7 +83,8 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 			d := math.Hypot(pcx2-ecx, pcy2-ecy)
 
 			if d <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx2, pcy2) {
-				w.Player.TakeDamage(stats.Damage)
+				dmg := int(float64(stats.Damage) * e.DamageMul())
+				w.Player.TakeDamage(dmg)
 			}
 
 			span := stats.AttackCooldownMax - stats.AttackCooldownMin

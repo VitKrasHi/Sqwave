@@ -3,11 +3,12 @@ package world
 import "Sqwave/internal/domain/geometry"
 
 type EnemyProjectile struct {
-	X, Y   float64
-	VX, VY float64
-	Size   float64
-	Life   int
-	Damage int
+	X, Y      float64
+	VX, VY    float64
+	Size      float64
+	Life      int
+	Damage    int
+	DamageMul float64
 }
 
 func (p *EnemyProjectile) Rect() geometry.Rect {

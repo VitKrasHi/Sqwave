@@ -12,6 +12,7 @@ const (
 	EnemyRammer
 	EnemySniper
 	EnemyRocketeer
+	EnemyBuffer
 )
 
 type EnemyStats struct {
@@ -57,6 +58,14 @@ type EnemyStats struct {
 	RocketFireRange       float64
 	RocketCooldown        int
 	RocketSize            float64
+
+	// Буфер.
+	BufferRange        float64
+	BufferMaxTargets   int
+	BufferDamageMul    float64
+	BufferSpeedMul     float64
+	BufferDuration     int
+	BufferRefreshTicks int
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -154,6 +163,20 @@ var enemyStats = map[EnemyType]EnemyStats{
 		RocketFireRange:       420,
 		RocketCooldown:        150,
 		RocketSize:            10,
+	},
+	EnemyBuffer: {
+		Name:               "Buffer",
+		MaxHP:              120,
+		SP:                 100,
+		Size:               22,
+		PreferredMin:       80,
+		PreferredMax:       200,
+		BufferRange:        260,
+		BufferMaxTargets:   5,
+		BufferDamageMul:    1.4,
+		BufferSpeedMul:     1.3,
+		BufferDuration:     30,
+		BufferRefreshTicks: 6,
 	},
 }
 
@@ -255,6 +278,14 @@ type Enemy struct {
 	// Ракетчик.
 	RocketFireTimer int
 
+	// Буфер (на самом буфере).
+	BufferTargets []int // индексы целей, обновляется каждый тик
+
+	// Баффы (на получателе).
+	BuffDamageMul float64
+	BuffSpeedMul  float64
+	BuffTimer     int
+
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).
 	HPMultiplier    float64
@@ -297,7 +328,12 @@ func (e *Enemy) TakeDamage(n int) {
 }
 
 func (e *Enemy) Speed() float64 {
-	return EnemyBaseSpeed + float64(e.Type.Stats().SP)*EnemySpeedPerSP
+	base := EnemyBaseSpeed + float64(e.Type.Stats().SP)*EnemySpeedPerSP
+	mul := e.BuffSpeedMul
+	if mul <= 0 {
+		mul = 1
+	}
+	return base * mul
 }
 
 // HPRatio — для отрисовки полоски здоровья над врагом.
@@ -314,4 +350,39 @@ func (e *Enemy) HPRatio() float64 {
 		return 1
 	}
 	return r
+}
+
+// DamageMul — множитель урона, накладываемый баффом.
+func (e *Enemy) DamageMul() float64 {
+	if e.BuffDamageMul <= 0 {
+		return 1
+	}
+	return e.BuffDamageMul
+}
+
+// ApplyBuff вешает/обновляет бафф. Больший множитель перекрывает
+// меньший, длительность обновляется.
+func (e *Enemy) ApplyBuff(dmgMul, spdMul float64, duration int) {
+	if dmgMul > e.BuffDamageMul {
+		e.BuffDamageMul = dmgMul
+	}
+	if spdMul > e.BuffSpeedMul {
+		e.BuffSpeedMul = spdMul
+	}
+	if duration > e.BuffTimer {
+		e.BuffTimer = duration
+	}
+}
+
+// TickBuffs тикает таймеры баффов. Возвращает false, если враг
+// живой и получает бафф; true если бафф истёк — но это неважно,
+// важно что поля обнуляются.
+func (e *Enemy) TickBuffs() {
+	if e.BuffTimer > 0 {
+		e.BuffTimer--
+	}
+	if e.BuffTimer == 0 {
+		e.BuffDamageMul = 0
+		e.BuffSpeedMul = 0
+	}
 }

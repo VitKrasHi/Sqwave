@@ -84,6 +84,9 @@ var (
 	ColorRocketeer        = color.NRGBA{R: 200, G: 140, B: 40, A: 255}
 	ColorEnemyRocket      = color.NRGBA{R: 255, G: 160, B: 60, A: 255}
 	ColorEnemyRocketTrail = color.NRGBA{R: 255, G: 100, B: 30, A: 150}
+
+	ColorBuffer     = color.NRGBA{R: 220, G: 200, B: 100, A: 255}
+	ColorBufferBeam = color.NRGBA{R: 255, G: 220, B: 120, A: 200}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

@@ -102,7 +102,16 @@ func StepEnemies(w *world.World) {
 			stepSniper(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyRocketeer:
 			stepRocketeer(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyBuffer:
+			stepBuffer(w, e, ecx, ecy, pcx, pcy, dist)
 		}
+	}
+
+	for i := range w.Enemies {
+		if w.Enemies[i].IsDead() {
+			continue
+		}
+		w.Enemies[i].TickBuffs()
 	}
 
 	// 3. Расталкивание — после всех движений к цели.

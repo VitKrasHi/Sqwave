@@ -34,7 +34,8 @@ func StepEnemyProjectiles(w *world.World) {
 		}
 
 		if !p.IsDead() && rect.Intersects(playerRect) {
-			p.TakeDamage(proj.Damage)
+			dmg := int(float64(proj.Damage) * proj.DamageMul)
+			p.TakeDamage(dmg)
 			continue
 		}
 

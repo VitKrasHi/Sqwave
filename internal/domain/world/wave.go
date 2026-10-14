@@ -10,11 +10,12 @@ type WaveComposition struct {
 	Rammer    int
 	Sniper    int
 	Rocketeer int
+	Buffer    int
 }
 
 func (c WaveComposition) Total() int {
 	return c.Infantry + c.Shooter + c.Scout + c.Medic +
-		c.Rammer + c.Sniper + c.Rocketeer
+		c.Rammer + c.Sniper + c.Rocketeer + c.Buffer
 }
 
 type WaveKind int
@@ -90,7 +91,7 @@ func WaveSizeFor(n, base int, rng intRng) int {
 
 // RandomEnemyType — равновероятный выбор типа врага.
 func RandomEnemyType(rng intRng) EnemyType {
-	switch rng.Intn(7) {
+	switch rng.Intn(8) {
 	case 0:
 		return EnemyInfantry
 	case 1:
@@ -103,8 +104,10 @@ func RandomEnemyType(rng intRng) EnemyType {
 		return EnemyRammer
 	case 5:
 		return EnemySniper
-	default:
+	case 6:
 		return EnemyRocketeer
+	default:
+		return EnemyBuffer
 	}
 }
 
@@ -134,6 +137,9 @@ func RandomEnemyTypeTimer(progress float64, rng intRng) EnemyType {
 	}
 	if progress > 0.75 {
 		pool = append(pool, EnemyRocketeer)
+	}
+	if progress > 0.5 {
+		pool = append(pool, EnemyBuffer)
 	}
 
 	return pool[rng.Intn(len(pool))]

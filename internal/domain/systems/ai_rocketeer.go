@@ -44,16 +44,17 @@ func fireEnemyRocket(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64)
 	startY := ecy + dy*stats.Size/2
 
 	w.EnemyRockets = append(w.EnemyRockets, world.EnemyRocket{
-		X:               startX,
-		Y:               startY,
-		VX:              dx * stats.RocketSpeed,
-		VY:              dy * stats.RocketSpeed,
-		Size:            stats.RocketSize,
-		Life:            stats.RocketLife,
-		MaxLife:         stats.RocketLife,
-		ExplosionDamage: stats.RocketExplosionDamage,
-		ExplosionRadius: stats.RocketExplosionRadius,
-		ExplosionLife:   stats.RocketExplosionLife,
-		HomingRate:      stats.RocketHomingRate,
+		X:                  startX,
+		Y:                  startY,
+		VX:                 dx * stats.RocketSpeed,
+		VY:                 dy * stats.RocketSpeed,
+		Size:               stats.RocketSize,
+		Life:               stats.RocketLife,
+		MaxLife:            stats.RocketLife,
+		ExplosionDamage:    stats.RocketExplosionDamage,
+		ExplosionDamageMul: e.DamageMul(),
+		ExplosionRadius:    stats.RocketExplosionRadius,
+		ExplosionLife:      stats.RocketExplosionLife,
+		HomingRate:         stats.RocketHomingRate,
 	})
 }

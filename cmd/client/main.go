@@ -109,6 +109,8 @@ func main() {
 		kind = world.MapTestSniper
 	case "rocketeer":
 		kind = world.MapTestRocketeer
+	case "buffer":
+		kind = world.MapTestBuffer
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}

@@ -67,7 +67,12 @@ func StepEnemyRockets(w *world.World) {
 		// Урон наносится только взрывом, если игрок в радиусе.
 		if !p.IsDead() {
 			if math.Hypot(pcx-r.X, pcy-r.Y) <= r.ExplosionRadius {
-				p.TakeDamage(r.ExplosionDamage)
+				mul := r.ExplosionDamageMul
+				if mul <= 0 {
+					mul = 1
+				}
+				dmg := int(float64(r.ExplosionDamage) * mul)
+				p.TakeDamage(dmg)
 			}
 		}
 

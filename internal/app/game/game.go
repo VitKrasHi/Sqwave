@@ -165,6 +165,7 @@ func (g *Game) Draw(r SceneRenderer) {
 
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
+	drawBufferBeams(r, w)
 	drawEnemies(r, w)
 
 	p := &w.Player
@@ -426,6 +427,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorSniper
 		case world.EnemyRocketeer:
 			c = ColorRocketeer
+		case world.EnemyBuffer:
+			c = ColorBuffer
 		default:
 			c = ColorEnemy
 		}
@@ -596,6 +599,33 @@ func drawSniperBeams(r SceneRenderer, w *world.World) {
 			c.A = uint8(40 + 80*progress)
 			thickness := 1.0 + progress*0.5
 			r.DrawLine(ecx, ecy, ex, ey, thickness, c)
+		}
+	}
+}
+
+func drawBufferBeams(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() || e.Type != world.EnemyBuffer {
+			continue
+		}
+		if len(e.BufferTargets) == 0 {
+			continue
+		}
+		ecx, ecy := e.Center()
+		pulse := math.Sin(float64(e.AITimer)*0.15)*0.5 + 1.0
+		thickness := 1.5 + pulse*0.8
+
+		for _, idx := range e.BufferTargets {
+			if idx < 0 || idx >= len(w.Enemies) {
+				continue
+			}
+			t := &w.Enemies[idx]
+			if t.IsDead() {
+				continue
+			}
+			tcx, tcy := t.Center()
+			r.DrawLine(ecx, ecy, tcx, tcy, thickness, ColorBufferBeam)
 		}
 	}
 }

@@ -13,9 +13,10 @@ type EnemyRocket struct {
 	Life    int
 	MaxLife int
 
-	ExplosionDamage int
-	ExplosionRadius float64
-	ExplosionLife   int
+	ExplosionDamage    int
+	ExplosionDamageMul float64
+	ExplosionRadius    float64
+	ExplosionLife      int
 
 	HomingRate float64
 }

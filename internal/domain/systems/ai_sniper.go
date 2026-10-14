@@ -144,6 +144,7 @@ func fireSniperShot(w *world.World, e *world.Enemy) {
 	if _, ok := geometry.RaySegmentIntersectsRect(ecx, ecy, ex, ey, pRect); ok {
 		dmg := stats.SniperDamageMin +
 			w.Rng.Intn(stats.SniperDamageMax-stats.SniperDamageMin+1)
+		dmg = int(float64(dmg) * e.DamageMul())
 		p.TakeDamage(dmg)
 	}
 }

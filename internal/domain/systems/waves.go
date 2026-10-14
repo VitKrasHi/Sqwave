@@ -179,18 +179,18 @@ func startWave(w *world.World) {
 	ws.Number++
 	ws.Composition = world.WaveComposition{}
 
+	ws.SpawnedCount = 0
+	ws.KilledCount = 0
+	ws.Active = true
+	ws.GroupRemaining = 0
+	ws.GroupSpawnTimer = 0
+
 	// Рандомно: 50/50 common или timer.
 	if w.Rng.Intn(2) == 0 {
 		startCommonWave(w)
 	} else {
 		startTimerWave(w)
 	}
-
-	ws.SpawnedCount = 0
-	ws.KilledCount = 0
-	ws.Active = true
-	ws.GroupRemaining = 0
-	ws.GroupSpawnTimer = 0
 }
 
 func startCommonWave(w *world.World) {
@@ -294,6 +294,8 @@ func spawnOneFromGroup(w *world.World) {
 		ws.Composition.Sniper++
 	case world.EnemyRocketeer:
 		ws.Composition.Rocketeer++
+	case world.EnemyBuffer:
+		ws.Composition.Buffer++
 	}
 
 	ws.GroupRemaining--
@@ -420,6 +422,8 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemySniper
 	case world.MapTestRocketeer:
 		t = world.EnemyRocketeer
+	case world.MapTestBuffer:
+		t = world.EnemyBuffer
 	default:
 		return
 	}
