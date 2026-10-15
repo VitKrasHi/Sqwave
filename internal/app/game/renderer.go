@@ -104,6 +104,17 @@ var (
 	ColorFlame       = color.NRGBA{R: 255, G: 140, B: 40, A: 220}
 	ColorFlameDim    = color.NRGBA{R: 200, G: 60, B: 20, A: 180}
 	ColorBurnOverlay = color.NRGBA{R: 255, G: 80, B: 20, A: 40}
+
+	ColorProtector     = color.NRGBA{R: 140, G: 200, B: 255, A: 255}
+	ColorProtectorBeam = color.NRGBA{R: 120, G: 200, B: 255, A: 200}
+	ColorDome          = color.NRGBA{R: 140, G: 220, B: 255, A: 60}
+	ColorDomeEdge      = color.NRGBA{R: 180, G: 240, B: 255, A: 140}
+
+	ColorTank           = color.NRGBA{R: 100, G: 100, B: 110, A: 255}
+	ColorTankShield     = color.NRGBA{R: 160, G: 180, B: 220, A: 180}
+	ColorTankShieldFill = color.NRGBA{R: 160, G: 180, B: 220, A: 50}
+	ColorTankHammer     = color.NRGBA{R: 200, G: 80, B: 40, A: 255}
+	ColorTankHammerWind = color.NRGBA{R: 255, G: 140, B: 60, A: 200}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

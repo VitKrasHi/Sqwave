@@ -181,6 +181,14 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 			continue
 		}
 
+		if e.Invulnerable {
+			continue
+		}
+
+		if BlocksDamageFrom(e, cx, cy) {
+			continue
+		}
+
 		e.LastSwingHitID = p.SwingID
 
 		if weapon.KnockbackForce > 0 {
@@ -256,9 +264,15 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	endY := startY + (maxEndY-startY)*enemyT
 
 	if hitEnemy != nil {
-		distance := enemyT * weapon.Range
-		dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
-		hitEnemy.TakeDamage(dmg)
+		if hitEnemy.Invulnerable {
+			// Попадание зарегистрировано визуально, но урона нет.
+		} else if BlocksDamageFrom(hitEnemy, startX, startY) {
+			// Урон заблокирован щитом танка.
+		} else {
+			distance := enemyT * weapon.Range
+			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			hitEnemy.TakeDamage(dmg)
+		}
 	}
 
 	w.Bullets = append(w.Bullets, world.Bullet{

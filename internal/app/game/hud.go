@@ -50,6 +50,12 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Flamer > 0 {
 		lines = append(lines, line{"Flamer", comp.Flamer, ColorFlamer})
 	}
+	if comp.Protector > 0 {
+		lines = append(lines, line{"Protector", comp.Protector, ColorProtector})
+	}
+	if comp.Tank > 0 {
+		lines = append(lines, line{"Tank", comp.Tank, ColorTank})
+	}
 
 	const (
 		panelW  = 260.0

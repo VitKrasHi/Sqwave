@@ -188,6 +188,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
+	drawProtectorBeams(r, w)
 	drawFleerCones(r, w)
 	drawTurrets(r, w)
 	drawEnemies(r, w)
@@ -471,6 +472,10 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorEngineer
 		case world.EnemyFlamer:
 			c = ColorFlamer
+		case world.EnemyProtector:
+			c = ColorProtector
+		case world.EnemyTank:
+			c = ColorTank
 		default:
 			c = ColorEnemy
 		}
@@ -499,6 +504,12 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			bx := cx + math.Cos(ang)*18
 			by := cy + math.Sin(ang)*18
 			r.DrawLine(cx, cy, bx, by, 5, ColorFleerBlade)
+		}
+
+		if e.Invulnerable {
+			cx, cy := e.Center()
+			rad := stats.Size*0.9 + 4
+			r.DrawCircle(cx, cy, rad, ColorDome)
 		}
 
 		if e.Type == world.EnemyEngineer && !e.HasPlacedTurret {
@@ -530,6 +541,45 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 				// Идёт к точке установки — маркер «несёт что-то».
 				marker := color.NRGBA{R: 220, G: 200, B: 100, A: 200}
 				r.DrawRect(e.X+stats.Size/2-4, e.Y-stats.Size/2-8, 8, 4, marker)
+			}
+		}
+
+		if e.Type == world.EnemyTank {
+			cx, cy := e.Center()
+			stats := e.Type.Stats()
+			arcRad := stats.ShieldArcDegrees * math.Pi / 360
+
+			// Щит — дуга из трёх отрезков по фронту.
+			shieldLen := stats.Size * 1.2
+			a1 := e.WeaponAngle - arcRad
+			a2 := e.WeaponAngle - arcRad*0.5
+			a3 := e.WeaponAngle + arcRad*0.5
+			a4 := e.WeaponAngle + arcRad
+
+			r.DrawLine(cx, cy, cx+math.Cos(a1)*shieldLen, cy+math.Sin(a1)*shieldLen, 3, ColorTankShield)
+			r.DrawLine(cx, cy, cx+math.Cos(a2)*shieldLen, cy+math.Sin(a2)*shieldLen, 3, ColorTankShield)
+			r.DrawLine(cx, cy, cx+math.Cos(a3)*shieldLen, cy+math.Sin(a3)*shieldLen, 3, ColorTankShield)
+			r.DrawLine(cx, cy, cx+math.Cos(a4)*shieldLen, cy+math.Sin(a4)*shieldLen, 3, ColorTankShield)
+
+			// Контур щита — плотная линия дуги.
+			r.DrawLine(
+				cx+math.Cos(a1)*shieldLen, cy+math.Sin(a1)*shieldLen,
+				cx+math.Cos(a4)*shieldLen, cy+math.Sin(a4)*shieldLen,
+				1, ColorTankShield,
+			)
+
+			// Индикатор замаха молота.
+			if e.HammerState == 1 {
+				progress := float64(e.HammerTimer) / float64(stats.HammerWindup)
+				rad := stats.HammerRange * progress
+				pulse := color.NRGBA{
+					R: 255,
+					G: 140,
+					B: 60,
+					A: uint8(40 + 80*progress),
+				}
+				r.DrawCircle(cx, cy, rad, pulse)
+				r.DrawCircle(cx, cy, rad, ColorTankHammerWind)
 			}
 		}
 
@@ -853,4 +903,31 @@ func (g *Game) DrawFrozen(r SceneRenderer) {
 
 	// Игрока НЕТ — он исчез.
 	// HUD НЕТ — сцена смерти сама управляет экраном.
+}
+
+func drawProtectorBeams(r SceneRenderer, w *world.World) {
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() || e.Type != world.EnemyProtector {
+			continue
+		}
+		if len(e.ProtectTargets) == 0 {
+			continue
+		}
+		ecx, ecy := e.Center()
+		pulse := math.Sin(float64(e.AITimer)*0.15)*0.5 + 1.0
+		thickness := 1.5 + pulse*0.8
+
+		for _, idx := range e.ProtectTargets {
+			if idx < 0 || idx >= len(w.Enemies) {
+				continue
+			}
+			t := &w.Enemies[idx]
+			if t.IsDead() {
+				continue
+			}
+			tcx, tcy := t.Center()
+			r.DrawLine(ecx, ecy, tcx, tcy, thickness, ColorProtectorBeam)
+		}
+	}
 }

@@ -127,6 +127,10 @@ func main() {
 		kind = world.MapTestEngineer
 	case "flamer":
 		kind = world.MapTestFlamer
+	case "protector":
+		kind = world.MapTestProtector
+	case "tank":
+		kind = world.MapTestTank
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}

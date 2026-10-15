@@ -46,6 +46,8 @@ const (
 	MapTestFleer
 	MapTestEngineer
 	MapTestFlamer
+	MapTestProtector
+	MapTestTank
 )
 
 func New() *World {

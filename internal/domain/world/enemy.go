@@ -16,6 +16,8 @@ const (
 	EnemyFleer
 	EnemyEngineer
 	EnemyFlamer
+	EnemyProtector
+	EnemyTank
 )
 
 type EnemyStats struct {
@@ -102,6 +104,20 @@ type EnemyStats struct {
 	FlameBurnRate    int     // раз в сколько тиков наносится 1 урона догорания
 	WeaponTurnRate   float64 // рад/тик
 	WeaponArcDegrees float64 // допустимое отклонение от цели для стрельбы
+
+	// Протектор.
+	ProtectRange      float64
+	ProtectMaxTargets int
+	ProtectDuration   int
+
+	// Танк.
+	ShieldArcDegrees   float64
+	HammerWindup       int
+	HammerRange        float64
+	HammerTriggerRange float64
+	HammerDamage       int
+	HammerCooldown     int
+	SupportCoverRange  float64
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -279,6 +295,36 @@ var enemyStats = map[EnemyType]EnemyStats{
 		WeaponTurnRate:   0.035, // ~2°/тик, полный оборот ~3 сек
 		WeaponArcDegrees: 25,    // стреляет, если оружие в 25° от игрока
 	},
+	EnemyProtector: {
+		Name:         "Protector",
+		MaxHP:        150,
+		SP:           150,
+		Size:         22,
+		PreferredMin: 100,
+		PreferredMax: 240,
+
+		ProtectRange:      300,
+		ProtectMaxTargets: 3,
+		ProtectDuration:   20, // 0.33 сек без обновления — купол гаснет
+	},
+	EnemyTank: {
+		Name:         "Tank",
+		MaxHP:        500,
+		SP:           50,
+		Size:         38,
+		PreferredMin: 80,
+		PreferredMax: 200,
+
+		WeaponTurnRate: 0.018, // ~1°/тик, полный оборот ~5.8 сек
+
+		ShieldArcDegrees:   140,
+		HammerWindup:       45,  // 0.75 сек замах
+		HammerRange:        130, // радиус AoE удара
+		HammerTriggerRange: 100, // триггер начала замаха
+		HammerDamage:       150,
+		HammerCooldown:     90, // 1.5 сек между ударами
+		SupportCoverRange:  400,
+	},
 }
 
 const (
@@ -403,6 +449,17 @@ type Enemy struct {
 	// Огнемётчик: угол оружия.
 	WeaponAngle float64
 	WeaponInit  bool
+
+	// Протектор — цели, которых защищает.
+	ProtectTargets []int
+	// Флаг неуязвимости (на получателе).
+	Invulnerable      bool
+	InvulnerableTimer int
+
+	// Танк.
+	HammerState    int // 0 idle, 1 windup
+	HammerTimer    int
+	HammerCooldown int
 
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).

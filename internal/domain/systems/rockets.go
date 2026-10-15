@@ -46,7 +46,9 @@ func StepRockets(w *world.World) {
 			weapon := r.Weapon.Stats()
 
 			if directHit != nil {
-				directHit.TakeDamage(weapon.DirectHitDamage)
+				if !directHit.Invulnerable && !BlocksDamageFrom(directHit, r.X, r.Y) {
+					directHit.TakeDamage(weapon.DirectHitDamage)
+				}
 			}
 			applyExplosionDamage(w, r.X, r.Y, r.ExplosionRadius,
 				weapon.ExplosionDamage, directHit)
@@ -69,6 +71,12 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
 		if e.IsDead() || e == exclude {
+			continue
+		}
+		if e.Invulnerable {
+			continue
+		}
+		if BlocksDamageFrom(e, x, y) {
 			continue
 		}
 		cx, cy := e.Center()

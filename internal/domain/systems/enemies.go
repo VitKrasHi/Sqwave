@@ -110,6 +110,10 @@ func StepEnemies(w *world.World) {
 			stepEngineer(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyFlamer:
 			stepFlamer(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyProtector:
+			stepProtector(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyTank:
+			stepTank(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 
@@ -118,6 +122,19 @@ func StepEnemies(w *world.World) {
 			continue
 		}
 		w.Enemies[i].TickBuffs()
+	}
+
+	// Тик неуязвимости — после обработки всех врагов.
+	for i := range w.Enemies {
+		if w.Enemies[i].IsDead() {
+			continue
+		}
+		if w.Enemies[i].InvulnerableTimer > 0 {
+			w.Enemies[i].InvulnerableTimer--
+			if w.Enemies[i].InvulnerableTimer == 0 {
+				w.Enemies[i].Invulnerable = false
+			}
+		}
 	}
 
 	// 3. Расталкивание — после всех движений к цели.
