@@ -420,7 +420,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		WeaponArcDegrees: 15,
 
 		HarpoonAimTime:    90, // 1.5 сек выцеливает
-		HarpoonSpeed:      5,  // быстро летит
+		HarpoonSpeed:      15, // быстро летит
 		HarpoonSize:       12,
 		HarpoonLife:       240,
 		HarpoonHP:         30,  // чтобы отстрелить

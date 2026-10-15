@@ -100,6 +100,7 @@ func (g *Game) Update() error {
 	systems.StepEnemyRockets(g.world)
 	systems.StepTurrets(g.world)
 	systems.StepBurning(g.world)
+	systems.StepHarpoons(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
