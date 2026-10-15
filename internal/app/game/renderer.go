@@ -92,6 +92,12 @@ var (
 	ColorFleerBlade = color.NRGBA{R: 255, G: 80, B: 120, A: 255}
 	ColorFleerCone  = color.NRGBA{R: 80, G: 220, B: 200, A: 60}
 	ColorFleerAim   = color.NRGBA{R: 80, G: 220, B: 200, A: 140}
+
+	ColorEngineer     = color.NRGBA{R: 220, G: 150, B: 70, A: 255}
+	ColorEngineerBeam = color.NRGBA{R: 220, G: 180, B: 100, A: 150}
+	ColorTurret       = color.NRGBA{R: 200, G: 120, B: 60, A: 255}
+	ColorTurretBarrel = color.NRGBA{R: 255, G: 160, B: 90, A: 255}
+	ColorTurretDetect = color.NRGBA{R: 220, G: 150, B: 70, A: 30}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

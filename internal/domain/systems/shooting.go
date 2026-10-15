@@ -197,6 +197,21 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 			e.TakeDamage(dmg)
 		}
 	}
+
+	for i := range w.Turrets {
+		t := &w.Turrets[i]
+		if t.IsDead() {
+			continue
+		}
+		if t.LastSwingHitID == p.SwingID {
+			continue
+		}
+		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, t.Rect()); ok {
+			t.LastSwingHitID = p.SwingID
+			dmg := p.Weapon.DamageAt(0, 1)
+			t.Damage(dmg)
+		}
+	}
 }
 
 // fireRay пускает один hitscan-луч под заданным углом и создаёт Bullet-отрезок.
@@ -223,8 +238,11 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	}
 
 	// Ближайший враг до стены.
+	// Ближайший враг или турель до стены.
 	enemyT := wallT
 	var hitEnemy *world.Enemy
+	var hitTurret *world.Turret
+
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
 		if e.IsDead() {
@@ -234,6 +252,20 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 			if t < enemyT {
 				enemyT = t
 				hitEnemy = e
+				hitTurret = nil
+			}
+		}
+	}
+	for i := range w.Turrets {
+		t := &w.Turrets[i]
+		if t.IsDead() {
+			continue
+		}
+		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, t.Rect()); ok {
+			if tt < enemyT {
+				enemyT = tt
+				hitTurret = t
+				hitEnemy = nil
 			}
 		}
 	}
@@ -245,6 +277,10 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		distance := enemyT * weapon.Range
 		dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
 		hitEnemy.TakeDamage(dmg)
+	} else if hitTurret != nil {
+		distance := enemyT * weapon.Range
+		dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+		hitTurret.Damage(dmg)
 	}
 
 	w.Bullets = append(w.Bullets, world.Bullet{

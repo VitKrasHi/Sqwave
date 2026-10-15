@@ -92,6 +92,7 @@ func (g *Game) Update() error {
 	systems.StepMedicHeal(g.world)
 	systems.StepEnemyProjectiles(g.world)
 	systems.StepEnemyRockets(g.world)
+	systems.StepTurrets(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -167,6 +168,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
 	drawFleerCones(r, w)
+	drawTurrets(r, w)
 	drawEnemies(r, w)
 
 	p := &w.Player
@@ -432,6 +434,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorBuffer
 		case world.EnemyFleer:
 			c = ColorFleer
+		case world.EnemyEngineer:
+			c = ColorEngineer
 		default:
 			c = ColorEnemy
 		}
@@ -460,6 +464,38 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			bx := cx + math.Cos(ang)*18
 			by := cy + math.Sin(ang)*18
 			r.DrawLine(cx, cy, bx, by, 5, ColorFleerBlade)
+		}
+
+		if e.Type == world.EnemyEngineer && !e.HasPlacedTurret {
+			stats := e.Type.Stats()
+			cx, cy := e.Center()
+
+			// Если в режиме отступления — красный маркер.
+			if e.FleeTimer > 0 {
+				r.DrawCircle(cx, cy, 18, color.NRGBA{R: 255, G: 80, B: 80, A: 120})
+			} else if e.TurretSetupTimer > 0 && e.MoveTimer <= 0 {
+				// Идёт установка — полоска прогресса.
+				const barW = 30.0
+				const barH = 5.0
+				total := float64(stats.TurretSetupTime)
+				progress := 1.0 - float64(e.TurretSetupTimer)/total
+
+				x := e.X + stats.Size/2 - barW/2
+				y := e.Y - stats.Size/2 - barH - 5
+
+				r.DrawRect(x-1, y-1, barW+2, barH+2, ColorEnemyHPBack)
+				c := color.NRGBA{R: 80, G: 220, B: 220, A: 255}
+				r.DrawRect(x, y, barW*progress, barH, c)
+
+				// Пульсирующее кольцо.
+				pulse := math.Sin(float64(e.AITimer)*0.4)*2 + 16
+				ring := color.NRGBA{R: 80, G: 220, B: 220, A: 80}
+				r.DrawCircle(cx, cy, pulse, ring)
+			} else if e.MoveTimer > 0 {
+				// Идёт к точке установки — маркер «несёт что-то».
+				marker := color.NRGBA{R: 220, G: 200, B: 100, A: 200}
+				r.DrawRect(e.X+stats.Size/2-4, e.Y-stats.Size/2-8, 8, 4, marker)
+			}
 		}
 
 		// Взгляд — короткий штрих из центра.
@@ -672,5 +708,45 @@ func drawFleerCones(r SceneRenderer, w *world.World) {
 		ax := ecx + math.Cos(e.AimAngle)*reach
 		ay := ecy + math.Sin(e.AimAngle)*reach
 		r.DrawLine(ecx, ecy, ax, ay, 2, ColorFleerAim)
+	}
+}
+
+func drawTurrets(r SceneRenderer, w *world.World) {
+	p := &w.Player
+	pcx, pcy := p.Center()
+
+	for i := range w.Turrets {
+		t := &w.Turrets[i]
+		if t.IsDead() {
+			continue
+		}
+
+		// Радиус обнаружения — слабый круг.
+		dist := math.Hypot(pcx-t.X, pcy-t.Y)
+		if dist < t.DetectRange {
+			r.DrawCircle(t.X, t.Y, t.DetectRange, ColorTurretDetect)
+		}
+
+		// Корпус.
+		r.DrawRect(t.X-t.Size/2, t.Y-t.Size/2, t.Size, t.Size, ColorTurret)
+
+		// Ствол в сторону игрока, если игрок близко.
+		if dist > 0.01 {
+			dirX := (pcx - t.X) / dist
+			dirY := (pcy - t.Y) / dist
+			bx := t.X + dirX*(t.Size/2+8)
+			by := t.Y + dirY*(t.Size/2+8)
+			r.DrawLine(t.X, t.Y, bx, by, 4, ColorTurretBarrel)
+		}
+
+		// HP-бар.
+		if t.HP < t.MaxHP {
+			const barH = 3.0
+			barW := t.Size
+			y := t.Y - t.Size/2 - barH - 2
+			ratio := float64(t.HP) / float64(t.MaxHP)
+			r.DrawRect(t.X-barW/2, y, barW, barH, ColorEnemyHPBack)
+			r.DrawRect(t.X-barW/2, y, barW*ratio, barH, ColorHPLow)
+		}
 	}
 }

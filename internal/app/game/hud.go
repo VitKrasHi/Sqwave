@@ -44,6 +44,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Fleer > 0 {
 		lines = append(lines, line{"Fleer", comp.Fleer, ColorFleer})
 	}
+	if comp.Engineer > 0 {
+		lines = append(lines, line{"Engineer", comp.Engineer, ColorEngineer})
+	}
 
 	const (
 		panelW  = 260.0
@@ -165,5 +168,20 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Groups left: %d", ws.GroupsRemaining),
 			panelX+12, y, ColorMenuDim)
+	}
+
+	// После drawWavePanel:
+	engineerSettingUp := false
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.Type == world.EnemyEngineer && e.TurretSetupTimer > 0 {
+			engineerSettingUp = true
+			break
+		}
+	}
+	if engineerSettingUp {
+		r.DrawScreenTextScaled("ENGINEER SETTING UP TURRET",
+			8, float64(world.ScreenHeight)-120, 1.6,
+			color.NRGBA{R: 255, G: 100, B: 100, A: 255})
 	}
 }

@@ -14,6 +14,7 @@ const (
 	EnemyRocketeer
 	EnemyBuffer
 	EnemyFleer
+	EnemyEngineer
 )
 
 type EnemyStats struct {
@@ -73,6 +74,26 @@ type EnemyStats struct {
 	FleerConeWidth float64 // полный угол конуса в градусах
 	FleerGrabRange float64 // радиус захвата
 	FleerLatchDmg  int     // урон в тик при захвате
+
+	// Инженер.
+	TurretCooldownMin int
+	TurretCooldownMax int
+	TurretMaxActive   int
+	TurretLife        int
+	TurretHP          int
+	TurretSize        float64
+	TurretDetectRange float64
+	TurretProjSpeed   float64
+	TurretProjSize    float64
+	TurretProjLife    int
+	TurretProjDamage  int
+	TurretBurstCount  int
+	TurretCooldown    int // кулдаун между очередями
+	TurretShotGap     int // тиков между выстрелами в очереди
+	TurretSetupTime   int // сколько тиков ставится турель (600 = 10 сек)
+	SetupMoveTime     int // сколько тиков даётся на подход к точке (180 = 3 сек)
+	FleeDuration      int // сколько тиков убегать после ранения
+
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -194,7 +215,39 @@ var enemyStats = map[EnemyType]EnemyStats{
 		FleerTurnRate:  0.035, // ~2° за тик, полный оборот ~3 сек
 		FleerConeWidth: 40,    // узкий конус (полный угол)
 		FleerGrabRange: 55,
-		FleerLatchDmg:  6, // HP за тик при захвате
+		FleerLatchDmg:  1, // HP за тик при захвате
+	},
+	EnemyEngineer: {
+		Name:              "Engineer",
+		MaxHP:             150,
+		SP:                120,
+		Size:              22,
+		PreferredMin:      150,
+		PreferredMax:      260,
+		AttackCooldownMin: 90,
+		AttackCooldownMax: 140,
+		ProjectileSpeed:   8,
+		ProjectileSize:    5,
+		ProjectileLife:    40,
+		ProjectileCount:   4,
+		ProjectileSpread:  28,
+
+		TurretSetupTime: 600, // 10 сек
+		SetupMoveTime:   180, // 3 сек на подход
+		FleeDuration:    120, // 2 сек убегания
+
+		TurretMaxActive:   6,
+		TurretLife:        1200,
+		TurretHP:          60,
+		TurretSize:        20,
+		TurretDetectRange: 550,
+		TurretProjSpeed:   7,
+		TurretProjSize:    5,
+		TurretProjLife:    60,
+		TurretProjDamage:  15,
+		TurretBurstCount:  3,
+		TurretCooldown:    120,
+		TurretShotGap:     10,
 	},
 }
 
@@ -307,6 +360,13 @@ type Enemy struct {
 	// Беглец.
 	AimAngle float64 // текущий угол взгляда, медленно вращается
 	Latched  bool    // сцепился с игроком
+
+	// Инженер.
+	TurretSetupTimer int     // оставшееся время установки (тикает только в точке)
+	MoveTimer        int     // оставшееся время движения к точке установки
+	FleeTimer        int     // отступление после ранения
+	HasPlacedTurret  bool    // турель уже поставлена
+	SetupX, SetupY   float64 // координаты точки установки
 
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).

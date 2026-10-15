@@ -10,6 +10,7 @@ import (
 type World struct {
 	Player           Player
 	Enemies          []Enemy
+	Turrets          []Turret
 	Bullets          []Bullet
 	Rockets          []Rocket
 	Explosions       []Explosion
@@ -43,6 +44,7 @@ const (
 	MapTestRocketeer
 	MapTestBuffer
 	MapTestFleer
+	MapTestEngineer
 )
 
 func New() *World {
