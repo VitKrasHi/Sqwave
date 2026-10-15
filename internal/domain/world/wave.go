@@ -2,6 +2,19 @@ package world
 
 import "Sqwave/internal/domain/geometry"
 
+type WaveKind int
+
+const (
+	WaveKindCommon WaveKind = iota
+	WaveKindTimer
+)
+
+// Ограничения на поддержку.
+const (
+	MaxSupportsPerGroup = 2
+	MaxSupportsPerWave  = 3
+)
+
 type WaveComposition struct {
 	Infantry      int
 	Shooter       int
@@ -28,13 +41,6 @@ func (c WaveComposition) Total() int {
 		c.Tank + c.MachineGunner + c.Summoner + c.Harpooner
 }
 
-type WaveKind int
-
-const (
-	WaveKindCommon WaveKind = iota
-	WaveKindTimer
-)
-
 type WaveState struct {
 	Number int
 
@@ -51,148 +57,186 @@ type WaveState struct {
 
 	WaveSize int
 
-	// Common-волна.
-	MaxWaveLevel    int
 	WaveLevel       int
 	GroupsTotal     int
 	GroupsRemaining int
 
-	// Настройки.
 	BaseWaveSize int
 	WavesLimit   int
 
-	// Тип волны.
 	Kind WaveKind
 
-	// Timer-волна.
-	TimerTotal     int // всего тиков
-	TimerRemaining int // осталось тиков
+	// Лимиты поддержки.
+	WaveSupports  int // сколько поддержки уже заспавнено в этой волне
+	GroupSupports int // сколько поддержки уже заспавнено в текущей группе
 
 	PauseTimer int
 	Active     bool
+
+	// Timer-волна.
+	TimerTotal         int
+	TimerRemaining     int
+	TimerGroupCooldown int // тиков до следующей группы
 }
 
 func (ws *WaveState) IsVictory() bool {
 	return ws.WavesLimit > 0 && ws.Number >= ws.WavesLimit && !ws.Active
 }
 
-// intRng — минимальный интерфейс для генератора случайных чисел.
 type intRng interface{ Intn(int) int }
 
-// WaveSizeFor — размер волны N.
-func WaveSizeFor(n, base int, rng intRng) int {
+// IsSupportType — является ли враг поддержкой (лечит/баффает/защищает).
+func IsSupportType(t EnemyType) bool {
+	switch t {
+	case EnemyMedic, EnemyBuffer, EnemyProtector:
+		return true
+	}
+	return false
+}
+
+// RandomWaveLevel — случайный уровень волны (1..5) в зависимости
+// от номера волны. Ранние волны — в основном I–II, поздние — IV–V.
+// Уже на первой волне есть шанс увидеть V (~1%).
+func RandomWaveLevel(waveNumber int, rng intRng) int {
+	if waveNumber < 1 {
+		waveNumber = 1
+	}
+
+	// Базовые веса для волны 1.
+	base := [5]int{100, 60, 30, 10, 2}
+	// Рост весов за каждую волну.
+	growth := [5]int{-15, -5, 5, 15, 20}
+
+	var w [5]int
+	total := 0
+	for i := 0; i < 5; i++ {
+		v := base[i] + (waveNumber-1)*growth[i]
+		if v < 1 {
+			v = 1
+		}
+		w[i] = v
+		total += v
+	}
+
+	roll := rng.Intn(total)
+	cum := 0
+	for i := 0; i < 5; i++ {
+		cum += w[i]
+		if roll < cum {
+			return i + 1
+		}
+	}
+	return 1
+}
+
+// WaveSizeFor — количество врагов в волне по уровню.
+func WaveSizeFor(level, base int, rng intRng) int {
 	if base <= 0 {
 		base = 100
 	}
-	size := base
-	if n > 1 {
-		size += (n - 1) * 15
-	}
-	maxSize := base * 2
-	if size > maxSize {
-		size = maxSize
-	}
-	spread := size / 6
-	if spread < 1 {
-		spread = 1
-	}
-	return size - spread + rng.Intn(spread*2+1)
-}
-
-// RandomEnemyType — равновероятный выбор типа врага.
-func RandomEnemyType(rng intRng) EnemyType {
-	switch rng.Intn(16) { // 16 базовых типов (Ghost не спавнится сам)
-	case 0:
-		return EnemyInfantry
+	offset := 0
+	spread := 20
+	switch level {
 	case 1:
-		return EnemyShooter
+		offset = 0
 	case 2:
-		return EnemyScout
+		offset = 20
 	case 3:
-		return EnemyMedic
+		offset = 40
 	case 4:
-		return EnemyRammer
+		offset = 60
+		spread = 40
 	case 5:
-		return EnemySniper
-	case 6:
-		return EnemyRocketeer
-	case 7:
-		return EnemyBuffer
-	case 8:
-		return EnemyFleer
-	case 9:
-		return EnemyEngineer
-	case 10:
-		return EnemyFlamer
-	case 11:
-		return EnemyProtector
-	case 12:
-		return EnemyTank
-	case 13:
-		return EnemyMachineGunner
-	case 14:
-		return EnemySummoner
-	default:
-		return EnemyHarpooner
+		offset = -50
+		spread = 50
 	}
+	min := base + offset
+	if min < 20 {
+		min = 20
+	}
+	return min + rng.Intn(spread+1)
 }
 
-// RandomEnemyTypeTimer — выбор типа врага для timer-волны.
-// Чем больше progress (0..1), тем шире пул типов: от Infantry/Shooter
-// до всех семи.
-func RandomEnemyTypeTimer(progress float64, rng intRng) EnemyType {
-	if progress < 0 {
-		progress = 0
+// GroupCountFor — количество групп в волне по уровню.
+func GroupCountFor(level int, rng intRng) int {
+	switch level {
+	case 1, 2:
+		return 8 + rng.Intn(3) // 8..10
+	case 3, 4:
+		return 5 + rng.Intn(4) // 5..8
+	case 5:
+		return 1
 	}
-	if progress > 1 {
-		progress = 1
+	return 8
+}
+
+// enemyTiers — враги по уровням (1..4).
+var enemyTiers = map[int][]EnemyType{
+	1: {EnemyInfantry, EnemyShooter, EnemyScout, EnemyMedic},
+	2: {EnemyRammer, EnemySniper, EnemyRocketeer, EnemyBuffer},
+	3: {EnemyFleer, EnemyEngineer, EnemyFlamer, EnemyProtector},
+	4: {EnemyTank, EnemyMachineGunner, EnemySummoner, EnemyHarpooner},
+}
+
+type tierWeights struct {
+	L1, L2, L3, L4 int
+}
+
+// waveTierWeights — веса уровней врагов для уровня волны.
+var waveTierWeights = map[int]tierWeights{
+	1: {85, 15, 0, 0},
+	2: {40, 45, 15, 0},
+	3: {5, 45, 45, 5},
+	4: {30, 30, 30, 10},
+	5: {5, 10, 45, 40},
+}
+
+// RandomEnemyTypeForWave — случайный враг по уровню волны.
+// allowSupport = false — поддержка исключается (перебрасывается).
+func RandomEnemyTypeForWave(level int, allowSupport bool, rng intRng) EnemyType {
+	w, ok := waveTierWeights[level]
+	if !ok {
+		w = waveTierWeights[1]
+	}
+	total := w.L1 + w.L2 + w.L3 + w.L4
+	if total <= 0 {
+		return EnemyInfantry
 	}
 
-	pool := []EnemyType{EnemyInfantry, EnemyShooter}
-	if progress > 1 {
-		pool = append(pool, EnemyScout)
+	for attempt := 0; attempt < 8; attempt++ {
+		roll := rng.Intn(total)
+		var tier int
+		switch {
+		case roll < w.L1:
+			tier = 1
+		case roll < w.L1+w.L2:
+			tier = 2
+		case roll < w.L1+w.L2+w.L3:
+			tier = 3
+		default:
+			tier = 4
+		}
+		pool := enemyTiers[tier]
+		t := pool[rng.Intn(len(pool))]
+		if allowSupport || !IsSupportType(t) {
+			return t
+		}
 	}
-	if progress > 1 {
-		pool = append(pool, EnemyMedic)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyRammer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemySniper)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyRocketeer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyBuffer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyFleer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyEngineer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyFlamer)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyProtector)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyTank)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyMachineGunner)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemySummoner)
-	}
-	if progress > 1 {
-		pool = append(pool, EnemyHarpooner)
-	}
+	// Не смогли избежать поддержки — пехотинец.
+	return EnemyInfantry
+}
 
-	return pool[rng.Intn(len(pool))]
+// TrackForLevel — путь к треку для уровня волны.
+func TrackForLevel(level int) string {
+	switch level {
+	case 1, 2:
+		return "assets/music/all_systems_go.wav"
+	case 3, 4:
+		return "assets/music/aesthetic_failure.wav"
+	case 5:
+		return "assets/music/elfire.wav"
+	}
+	return ""
 }
 
 // SpawnPoints — базовые точки для выбора центра группы.
@@ -205,4 +249,43 @@ var SpawnPoints = []geometry.Point{
 	{X: 1650, Y: 1900},
 	{X: 800, Y: 1200},
 	{X: 2400, Y: 1200},
+}
+
+// TimerTrackForLevel — путь к треку для timer-волны по уровню.
+func TimerTrackForLevel(level int) string {
+	switch level {
+	case 1, 2:
+		return "assets/music/experiment_7.wav"
+	case 3, 4:
+		return "assets/music/bounce_automation.wav"
+	case 5:
+		return "assets/music/cultivating_madness.wav"
+	}
+	return ""
+}
+
+// TimerGroupIntervalFor — интервал между группами в тиках.
+func TimerGroupIntervalFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 30 * 60 // 30 сек
+	case 3, 4:
+		return 25 * 60 // 25 сек
+	case 5:
+		return 20 * 60 // 20 сек
+	}
+	return 30 * 60
+}
+
+// TimerGroupSizeRangeFor — диапазон размера группы.
+func TimerGroupSizeRangeFor(level int) (int, int) {
+	switch level {
+	case 1:
+		return 20, 40
+	case 2, 3:
+		return 25, 50
+	case 4, 5:
+		return 30, 60
+	}
+	return 20, 40
 }

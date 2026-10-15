@@ -62,6 +62,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Summoner > 0 {
 		lines = append(lines, line{"Summoner", comp.Summoner, ColorSummoner})
 	}
+	if comp.Harpooner > 0 {
+		lines = append(lines, line{"Harpooner", comp.Harpooner, ColorHarpooner})
+	}
 
 	const (
 		panelW  = 260.0
@@ -75,14 +78,25 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	panelX := float64(world.ScreenWidth) - panelW - 12
 	panelY := 12.0
 
+	// Сколько строк в шапке: заголовок Wave + Level (если волна стартовала).
 	headerLines := 1
 	if ws.Number > 0 {
-		headerLines++
+		headerLines++ // Level
 	}
-	progressLines := 3
-	if ws.GroupRemaining > 0 || ws.Kind == world.WaveKindTimer {
+	if ws.Active && ws.Kind == world.WaveKindTimer {
+		headerLines++ // TIMER mm:ss
+	}
+
+	// Сколько строк прогресса.
+	progressLines := 3 // Spawned/Killed/Alive
+	if ws.GroupRemaining > 0 {
+		progressLines++
+	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
+		progressLines++
+	} else if ws.Kind == world.WaveKindTimer && ws.TimerGroupCooldown > 0 {
 		progressLines++
 	}
+
 	panelH := headerH +
 		float64(headerLines-1)*rowH +
 		float64(len(lines))*rowH +
@@ -92,6 +106,7 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	r.DrawScreenRect(panelX-2, panelY-2, panelW+4, panelH+4, ColorMenuBorder)
 	r.DrawScreenRect(panelX, panelY, panelW, panelH, ColorMenuPanel)
 
+	// Заголовок.
 	title := "Wave -"
 	if ws.Number > 0 {
 		if ws.WavesLimit > 0 {
@@ -104,18 +119,34 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 
 	y := panelY + headerH
 
-	// Строка типа волны / таймера.
+	// Строка уровня + тип волны.
 	if ws.Number > 0 {
-		if ws.Kind == world.WaveKindTimer {
-			sec := ws.TimerRemaining / 60
-			min := sec / 60
-			sec = sec % 60
-			text := fmt.Sprintf("TIMER %02d:%02d", min, sec)
-			r.DrawScreenText(text, panelX+12, y, ColorMenuSelected)
-		} else {
-			r.DrawScreenText(fmt.Sprintf("Level %d / %d", ws.WaveLevel, ws.MaxWaveLevel),
-				panelX+12, y, ColorMenuText)
+		roman := []string{"", "I", "II", "III", "IV", "V"}
+		lvl := ws.WaveLevel
+		if lvl < 1 {
+			lvl = 1
 		}
+		if lvl > 5 {
+			lvl = 5
+		}
+		kindStr := "COMMON"
+		kindCol := ColorMenuText
+		if ws.Kind == world.WaveKindTimer {
+			kindStr = "TIMER"
+			kindCol = ColorMenuSelected
+		}
+		r.DrawScreenText(fmt.Sprintf("%s  Level %s", kindStr, roman[lvl]),
+			panelX+12, y, kindCol)
+		y += rowH
+	}
+
+	// Таймер обратного отсчёта для timer-волны.
+	if ws.Active && ws.Kind == world.WaveKindTimer {
+		sec := ws.TimerRemaining / 60
+		min := sec / 60
+		sec = sec % 60
+		timerStr := fmt.Sprintf("TIMER %02d:%02d", min, sec)
+		r.DrawScreenText(timerStr, panelX+12, y, ColorMenuSelected)
 		y += rowH
 	}
 
@@ -161,11 +192,8 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 
 	// Прогресс.
 	if ws.Kind == world.WaveKindTimer {
-		progress := 0.0
-		if ws.TimerTotal > 0 {
-			progress = 1 - float64(ws.TimerRemaining)/float64(ws.TimerTotal)
-		}
-		r.DrawScreenText(fmt.Sprintf("Difficulty: %d%%", int(progress*100)),
+		// Timer-волна: спавн-прогресс.
+		r.DrawScreenText(fmt.Sprintf("Spawned: %d", ws.SpawnedCount),
 			panelX+12, y, ColorMenuText)
 		y += slotH
 	} else {
@@ -188,15 +216,20 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 		panelX+12, y, ColorMenuText)
 	y += slotH
 
+	// Статус текущей группы.
 	if ws.GroupRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Group: %d left", ws.GroupRemaining),
 			panelX+12, y, ColorMenuDim)
 	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Groups left: %d", ws.GroupsRemaining),
 			panelX+12, y, ColorMenuDim)
+	} else if ws.Kind == world.WaveKindTimer && ws.TimerGroupCooldown > 0 {
+		sec := ws.TimerGroupCooldown / 60
+		r.DrawScreenText(fmt.Sprintf("Next group: %ds", sec),
+			panelX+12, y, ColorMenuDim)
 	}
 
-	// После drawWavePanel:
+	// Инженер ставит турель.
 	engineerSettingUp := false
 	for i := range w.Enemies {
 		e := &w.Enemies[i]

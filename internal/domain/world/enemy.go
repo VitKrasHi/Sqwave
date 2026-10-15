@@ -280,6 +280,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		MaxHP:             150,
 		SP:                120,
 		Size:              22,
+		Damage:            25,
 		PreferredMin:      150,
 		PreferredMax:      260,
 		AttackCooldownMin: 90,

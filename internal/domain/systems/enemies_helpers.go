@@ -161,13 +161,14 @@ func fireEnemyProjectile(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy floa
 		sin := math.Sin(angle)
 
 		w.EnemyProjectiles = append(w.EnemyProjectiles, world.EnemyProjectile{
-			X:      ecx + cos*half - stats.ProjectileSize/2,
-			Y:      ecy + sin*half - stats.ProjectileSize/2,
-			VX:     cos * stats.ProjectileSpeed,
-			VY:     sin * stats.ProjectileSpeed,
-			Size:   stats.ProjectileSize,
-			Life:   stats.ProjectileLife,
-			Damage: stats.Damage,
+			X:         ecx + cos*half - stats.ProjectileSize/2,
+			Y:         ecy + sin*half - stats.ProjectileSize/2,
+			VX:        cos * stats.ProjectileSpeed,
+			VY:        sin * stats.ProjectileSpeed,
+			Size:      stats.ProjectileSize,
+			Life:      stats.ProjectileLife,
+			Damage:    stats.Damage,
+			DamageMul: e.DamageMul(), // ← добавили
 		})
 	}
 }

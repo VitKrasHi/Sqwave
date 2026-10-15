@@ -60,7 +60,6 @@ func (a *App) openMenu() {
 
 func (a *App) openSetup() {
 	a.current = setup.New(
-		a.music,
 		func(s setup.Settings) { a.startGame(s) },
 		func() { a.openMenu() },
 	)
@@ -69,21 +68,17 @@ func (a *App) openSetup() {
 func (a *App) startGame(s setup.Settings) {
 	w := world.NewWithOptions(time.Now().UnixNano(), a.mapKind, world.Options{
 		BaseWaveSize: s.EnemiesPerWave,
-		MaxWaveLevel: s.MaxWaveLevel,
 		WavesLimit:   s.WavesLimit,
 	})
 	if a.mapKind != world.MapDefault {
 		systems.StartTestRoom(w, a.mapKind)
 	}
-
 	g := game.New(w, ebiteninput.New(), a.music)
-
 	g.SetOnPlayerDied(func() {
 		a.current = death.New(g, a.music, func() {
 			a.openMenu()
 		})
 	})
-
 	a.current = g
 }
 
@@ -151,7 +146,6 @@ func main() {
 	if *skipMenu {
 		a.startGame(setup.Settings{
 			EnemiesPerWave: 100,
-			MaxWaveLevel:   5,
 			WavesLimit:     0,
 		})
 	} else {

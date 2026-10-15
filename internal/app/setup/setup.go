@@ -9,16 +9,14 @@ import (
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/particles"
 	"Sqwave/internal/domain/world"
-	"Sqwave/internal/infra/audio"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Settings struct {
-	EnemiesPerWave int // минимум 10, шаг 5
-	MaxWaveLevel   int // 1..10
-	WavesLimit     int // 0 = бесконечные
+	EnemiesPerWave int
+	WavesLimit     int
 }
 
 const (
@@ -26,21 +24,17 @@ const (
 	maxEnemies  = 300
 	stepEnemies = 5
 
-	minLevel = 1
-	maxLevel = 10
-
 	minWaves = 0
 	maxWaves = 99
 
 	panelW = 520.0
-	panelH = 560.0
+	panelH = 500.0
 )
 
 type row int
 
 const (
 	rowEnemies row = iota
-	rowLevel
 	rowWaves
 	rowStart
 	rowBack
@@ -58,43 +52,21 @@ type Scene struct {
 	repeatDelay int
 	repeatRate  int
 	heldDir     int
-
-	music *audio.Player
 }
 
-func New(music *audio.Player, onStart func(Settings), onBack func()) *Scene {
+func New(onStart func(Settings), onBack func()) *Scene {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	s := &Scene{
 		settings: Settings{
 			EnemiesPerWave: 100,
-			MaxWaveLevel:   5,
 			WavesLimit:     0,
 		},
 		onStart: onStart,
 		onBack:  onBack,
-		music:   music,
 	}
 	s.ps = particles.New(40, float64(world.ScreenWidth)-40,
 		40, float64(world.ScreenHeight)-40, rng)
 	return s
-}
-
-// rowRect — единый источник координат: используется и в Draw, и в hit-test.
-func (s *Scene) rowRect(idx row) (x, y, w, h float64) {
-	px, py := panelOrigin()
-	switch idx {
-	case rowEnemies:
-		return px + 30, py + 120, panelW - 60, 40
-	case rowLevel:
-		return px + 30, py + 195, panelW - 60, 40
-	case rowWaves:
-		return px + 30, py + 270, panelW - 60, 40
-	case rowStart:
-		return px + 60, py + 390, panelW - 120, 50
-	case rowBack:
-		return px + 60, py + 464, panelW - 120, 50
-	}
-	return 0, 0, 0, 0
 }
 
 func panelOrigin() (float64, float64) {
@@ -103,15 +75,26 @@ func panelOrigin() (float64, float64) {
 	return (sw - panelW) / 2, (sh - panelH) / 2
 }
 
-func (s *Scene) Update() error {
-	if s.music != nil {
-		_ = s.music.PlayLoop("assets/music/nfx.wav")
+func (s *Scene) rowRect(idx row) (x, y, w, h float64) {
+	px, py := panelOrigin()
+	switch idx {
+	case rowEnemies:
+		return px + 30, py + 140, panelW - 60, 40
+	case rowWaves:
+		return px + 30, py + 215, panelW - 60, 40
+	case rowStart:
+		return px + 60, py + 330, panelW - 120, 50
+	case rowBack:
+		return px + 60, py + 404, panelW - 120, 50
 	}
+	return 0, 0, 0, 0
+}
 
+func (s *Scene) Update() error {
 	particles.Update(s.ps, 40, float64(world.ScreenWidth)-40,
 		40, float64(world.ScreenHeight)-40)
 
-	// Навигация.
+	// Навигация по строкам.
 	if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) || inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		s.selected = (s.selected + 1) % int(rowCount)
 	}
@@ -136,14 +119,7 @@ func (s *Scene) Update() error {
 					s.onBack()
 					return nil
 				}
-				// Для строк-настроек — сразу переключаем значение
-				// при клике, чтобы клик был осмысленным.
 				switch i {
-				case rowLevel:
-					s.settings.MaxWaveLevel++
-					if s.settings.MaxWaveLevel > maxLevel {
-						s.settings.MaxWaveLevel = minLevel
-					}
 				case rowWaves:
 					if s.settings.WavesLimit == 0 {
 						s.settings.WavesLimit = 5
@@ -163,8 +139,6 @@ func (s *Scene) Update() error {
 	switch row(s.selected) {
 	case rowEnemies:
 		s.handleNumericInput(&s.settings.EnemiesPerWave, stepEnemies, minEnemies, maxEnemies)
-	case rowLevel:
-		s.handleNumericInput(&s.settings.MaxWaveLevel, 1, minLevel, maxLevel)
 	case rowWaves:
 		s.handleWavesInput()
 	case rowStart:
@@ -183,7 +157,6 @@ func (s *Scene) Update() error {
 	return nil
 }
 
-// handleNumericInput — общий обработчик для числовых настроек с автоповтором.
 func (s *Scene) handleNumericInput(val *int, step, minVal, maxVal int) {
 	leftHeld := ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
 	rightHeld := ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD)
@@ -224,7 +197,6 @@ func (s *Scene) handleNumericInput(val *int, step, minVal, maxVal int) {
 	s.repeatRate = 4
 }
 
-// handleWavesInput — особый случай: 0 = бесконечные.
 func (s *Scene) handleWavesInput() {
 	leftHeld := ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
 	rightHeld := ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD)
@@ -285,9 +257,6 @@ func (s *Scene) clamp(val *int, minVal, maxVal int) {
 }
 
 func (s *Scene) Draw(r game.SceneRenderer) {
-	sh := float64(world.ScreenHeight)
-	_ = sh
-
 	r.Clear(color.NRGBA{R: 10, G: 12, B: 20, A: 255})
 	particles.Draw(r, s.ps)
 
@@ -311,8 +280,6 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 
 	s.drawNumericRow(r, rowEnemies, "Enemies per wave",
 		fmt.Sprintf("%d", s.settings.EnemiesPerWave))
-	s.drawNumericRow(r, rowLevel, "Max wave level",
-		fmt.Sprintf("%d / %d", s.settings.MaxWaveLevel, maxLevel))
 	s.drawNumericRow(r, rowWaves, "Waves to win", wavesValue)
 
 	s.drawButton(r, rowStart, "Start")
@@ -326,7 +293,6 @@ func (s *Scene) drawNumericRow(r game.SceneRenderer, idx row, label, value strin
 	x, y, _, _ := s.rowRect(idx)
 	selected := int(idx) == s.selected
 
-	// Подсветка строки.
 	if selected {
 		hl := color.NRGBA{R: 40, G: 70, B: 110, A: 120}
 		r.DrawScreenRect(x, y, panelW-60, 40, hl)

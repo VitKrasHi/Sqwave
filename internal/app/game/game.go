@@ -94,6 +94,13 @@ func (g *Game) Update() error {
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
 	systems.StepWaves(g.world)
+	if g.world.PendingTrack != "" {
+		if g.music != nil {
+			_ = g.music.PlayLoopForce(g.world.PendingTrack)
+		}
+		g.world.PendingTrack = ""
+	}
+
 	systems.StepEnemies(g.world)
 	systems.StepMedicHeal(g.world)
 	systems.StepEnemyProjectiles(g.world)
