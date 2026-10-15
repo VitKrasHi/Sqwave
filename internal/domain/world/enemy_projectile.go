@@ -9,6 +9,9 @@ type EnemyProjectile struct {
 	Life      int
 	Damage    int
 	DamageMul float64
+
+	// Пламя — при попадании дополнительно поджигает игрока.
+	Flame bool
 }
 
 func (p *EnemyProjectile) Rect() geometry.Rect {

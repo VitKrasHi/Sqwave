@@ -41,6 +41,10 @@ type Player struct {
 	Held   bool
 	HeldBy int
 
+	// Догорание.
+	BurnTimer int // оставшиеся тики горения
+	BurnTick  int // накопитель до следующего тика урона
+
 	IsFiring bool
 }
 
@@ -200,4 +204,16 @@ func (p *Player) AimSpeed() float64 {
 // DashSpeed — скорость во время рывка.
 func (p *Player) DashSpeed() float64 {
 	return p.MoveSpeed() * DashSpeedMultiplier
+}
+
+// ApplyBurn накладывает/обновляет догорание.
+// Большая длительность перекрывает меньшую.
+func (p *Player) ApplyBurn(ticks int) {
+	if ticks > p.BurnTimer {
+		p.BurnTimer = ticks
+	}
+}
+
+func (p *Player) IsBurning() bool {
+	return p.BurnTimer > 0
 }

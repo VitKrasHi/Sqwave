@@ -47,6 +47,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Engineer > 0 {
 		lines = append(lines, line{"Engineer", comp.Engineer, ColorEngineer})
 	}
+	if comp.Flamer > 0 {
+		lines = append(lines, line{"Flamer", comp.Flamer, ColorFlamer})
+	}
 
 	const (
 		panelW  = 260.0
@@ -117,6 +120,11 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if w.Player.Held {
 		r.DrawScreenTextScaled("!! CAUGHT !!", 8, float64(world.ScreenHeight)-90, 2.0,
 			color.NRGBA{R: 255, G: 60, B: 80, A: 255})
+	}
+
+	if w.Player.IsBurning() {
+		r.DrawScreenTextScaled("BURNING", 8, 80, 1.4,
+			color.NRGBA{R: 255, G: 120, B: 40, A: 255})
 	}
 
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {

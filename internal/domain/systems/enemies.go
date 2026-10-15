@@ -108,6 +108,8 @@ func StepEnemies(w *world.World) {
 			stepFleer(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyEngineer:
 			stepEngineer(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyFlamer:
+			stepFlamer(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 

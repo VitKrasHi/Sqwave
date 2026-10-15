@@ -125,6 +125,8 @@ func main() {
 		kind = world.MapTestFleer
 	case "engineer":
 		kind = world.MapTestEngineer
+	case "flamer":
+		kind = world.MapTestFlamer
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}

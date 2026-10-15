@@ -36,6 +36,14 @@ func StepEnemyProjectiles(w *world.World) {
 		if !p.IsDead() && rect.Intersects(playerRect) {
 			dmg := int(float64(proj.Damage) * proj.DamageMul)
 			p.TakeDamage(dmg)
+
+			if proj.Flame {
+				// Поджигаем игрока.
+				// Найти длительность и rate можно из статов огнемётчика.
+				// Проще — захардкодить через константы статов.
+				fStats := world.EnemyFlamer.Stats()
+				p.ApplyBurn(fStats.FlameBurnTicks)
+			}
 			continue
 		}
 

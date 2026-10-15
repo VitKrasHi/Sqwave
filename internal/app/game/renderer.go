@@ -98,6 +98,12 @@ var (
 	ColorTurret       = color.NRGBA{R: 200, G: 120, B: 60, A: 255}
 	ColorTurretBarrel = color.NRGBA{R: 255, G: 160, B: 90, A: 255}
 	ColorTurretDetect = color.NRGBA{R: 220, G: 150, B: 70, A: 30}
+
+	ColorFlamer      = color.NRGBA{R: 240, G: 100, B: 40, A: 255}
+	ColorFlamerHot   = color.NRGBA{R: 255, G: 200, B: 80, A: 255}
+	ColorFlame       = color.NRGBA{R: 255, G: 140, B: 40, A: 220}
+	ColorFlameDim    = color.NRGBA{R: 200, G: 60, B: 20, A: 180}
+	ColorBurnOverlay = color.NRGBA{R: 255, G: 80, B: 20, A: 40}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

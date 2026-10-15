@@ -15,6 +15,7 @@ const (
 	EnemyBuffer
 	EnemyFleer
 	EnemyEngineer
+	EnemyFlamer
 )
 
 type EnemyStats struct {
@@ -94,6 +95,13 @@ type EnemyStats struct {
 	SetupMoveTime     int // сколько тиков даётся на подход к точке (180 = 3 сек)
 	FleeDuration      int // сколько тиков убегать после ранения
 
+	// Огнемётчик.
+	FlameDamage      int     // разовый урон от частицы
+	FlameBurnDamage  int     // урон догорания за тик (накапливается)
+	FlameBurnTicks   int     // длительность догорания в тиках
+	FlameBurnRate    int     // раз в сколько тиков наносится 1 урона догорания
+	WeaponTurnRate   float64 // рад/тик
+	WeaponArcDegrees float64 // допустимое отклонение от цели для стрельбы
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -249,6 +257,28 @@ var enemyStats = map[EnemyType]EnemyStats{
 		TurretCooldown:    120,
 		TurretShotGap:     10,
 	},
+	EnemyFlamer: {
+		Name:              "Flamer",
+		MaxHP:             300,
+		SP:                100,
+		Size:              24,
+		PreferredMin:      60,
+		PreferredMax:      220,
+		AttackCooldownMin: 3,
+		AttackCooldownMax: 6,
+		ProjectileSpeed:   7,
+		ProjectileSize:    10,
+		ProjectileLife:    35,
+		ProjectileCount:   3,
+		ProjectileSpread:  45,
+
+		FlameDamage:      5,
+		FlameBurnDamage:  1,
+		FlameBurnTicks:   600,   // 10 сек
+		FlameBurnRate:    60,    // 1 урон раз в секунду
+		WeaponTurnRate:   0.035, // ~2°/тик, полный оборот ~3 сек
+		WeaponArcDegrees: 25,    // стреляет, если оружие в 25° от игрока
+	},
 }
 
 const (
@@ -368,6 +398,12 @@ type Enemy struct {
 	HasPlacedTurret  bool    // турель уже поставлена
 	SetupX, SetupY   float64 // координаты точки установки
 
+	// Множитель скорости (используется огнемётчиком по HP).
+	SpeedScale float64
+	// Огнемётчик: угол оружия.
+	WeaponAngle float64
+	WeaponInit  bool
+
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).
 	HPMultiplier    float64
@@ -415,7 +451,11 @@ func (e *Enemy) Speed() float64 {
 	if mul <= 0 {
 		mul = 1
 	}
-	return base * mul
+	scale := e.SpeedScale
+	if scale <= 0 {
+		scale = 1
+	}
+	return base * mul * scale
 }
 
 // HPRatio — для отрисовки полоски здоровья над врагом.

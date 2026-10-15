@@ -99,6 +99,7 @@ func (g *Game) Update() error {
 	systems.StepEnemyProjectiles(g.world)
 	systems.StepEnemyRockets(g.world)
 	systems.StepTurrets(g.world)
+	systems.StepBurning(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -159,7 +160,14 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	for _, proj := range w.EnemyProjectiles {
-		r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
+		if proj.Flame {
+			// Пламя — круг с пульсацией.
+			pulse := 0.7 + 0.3*float64(proj.Life%6)/6
+			r.DrawCircle(proj.X+proj.Size/2, proj.Y+proj.Size/2,
+				proj.Size/2*pulse, ColorFlame)
+		} else {
+			r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
+		}
 	}
 
 	// Ракеты: хвост + голова.
@@ -226,6 +234,18 @@ func (g *Game) Draw(r SceneRenderer) {
 
 	drawHPBar(r, p.CurrentHP(), p.MaxHP())
 	drawWavePanel(r, w)
+
+	if p.IsBurning() {
+		intensity := float64(p.BurnTimer) / 600
+		if intensity > 1 {
+			intensity = 1
+		}
+		pulse := 0.7 + 0.3*math.Sin(float64(g.ticks)*0.3)
+		alpha := uint8(float64(ColorBurnOverlay.A) * intensity * pulse)
+		c := ColorBurnOverlay
+		c.A = alpha
+		r.DrawScreenRect(0, 0, float64(world.ScreenWidth), float64(world.ScreenHeight), c)
+	}
 
 	if g.menu.Open {
 		drawMenu(r, &g.menu, p)
@@ -449,6 +469,8 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorFleer
 		case world.EnemyEngineer:
 			c = ColorEngineer
+		case world.EnemyFlamer:
+			c = ColorFlamer
 		default:
 			c = ColorEnemy
 		}
