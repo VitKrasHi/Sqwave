@@ -2,12 +2,19 @@ package ebitenrender
 
 import (
 	"image/color"
+	"log"
+	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font/basicfont"
+)
+
+var (
+	imageCache   = map[string]*ebiten.Image{}
+	imageCacheMu sync.Mutex
 )
 
 type Renderer struct {
@@ -99,4 +106,37 @@ func (r *Renderer) DrawScreenTextScaled(s string, x, y, scale float64, c color.N
 func (r *Renderer) DrawWorldCell(x, y, size float64, c color.NRGBA) {
 	sx, sy := r.w2s(x, y)
 	ebitenutil.DrawRect(r.screen, sx, sy, size*r.zoom, size*r.zoom, c)
+}
+
+func (r *Renderer) DrawScreenImage(path string, x, y, w, h float64) {
+	imageCacheMu.Lock()
+	img, ok := imageCache[path]
+	imageCacheMu.Unlock()
+
+	if !ok {
+		loaded, _, err := ebitenutil.NewImageFromFile(path)
+		if err != nil {
+			log.Printf("DrawScreenImage: failed to load %q: %v", path, err)
+			// Рисуем заглушку вместо картинки.
+			r.DrawScreenRect(x, y, w, h, color.NRGBA{R: 20, G: 0, B: 0, A: 255})
+			r.DrawScreenTextScaled("IMAGE NOT FOUND", x+20, y+h/2, 2.0,
+				color.NRGBA{R: 255, G: 40, B: 40, A: 255})
+			return
+		}
+		img = loaded
+		imageCacheMu.Lock()
+		imageCache[path] = img
+		imageCacheMu.Unlock()
+	}
+
+	iw := float64(img.Bounds().Dx())
+	ih := float64(img.Bounds().Dy())
+	if iw < 1 || ih < 1 {
+		return
+	}
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(w/iw, h/ih)
+	op.GeoM.Translate(x, y)
+	r.screen.DrawImage(img, op)
 }

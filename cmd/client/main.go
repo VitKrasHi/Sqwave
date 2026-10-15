@@ -13,6 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"Sqwave/internal/app"
+	"Sqwave/internal/app/death"
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/menu"
 	"Sqwave/internal/app/setup"
@@ -74,7 +75,16 @@ func (a *App) startGame(s setup.Settings) {
 	if a.mapKind != world.MapDefault {
 		systems.StartTestRoom(w, a.mapKind)
 	}
-	a.current = game.New(w, ebiteninput.New(), a.music)
+
+	g := game.New(w, ebiteninput.New(), a.music)
+
+	g.SetOnPlayerDied(func() {
+		a.current = death.New(g, a.music, func() {
+			a.openMenu()
+		})
+	})
+
+	a.current = g
 }
 
 func main() {

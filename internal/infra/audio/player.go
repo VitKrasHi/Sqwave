@@ -3,7 +3,6 @@ package audio
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -24,15 +23,26 @@ func New() (*Player, error) {
 	}, nil
 }
 
-// PlayLoop загружает WAV-файл и запускает его в цикле.
-// Если этот трек уже играет — ничего не делает.
-// Если играет другой — останавливает его и запускает новый.
+// PlayLoop — играет трек в цикле, если НИЧЕГО не играет.
+// Если что-то уже играет (то же или другое) — ничего не делает.
+// Благодаря этому трек смерти может «пережить» переход в меню.
 func (p *Player) PlayLoop(path string) error {
+	if p.current != nil {
+		return nil
+	}
+	return p.playInternal(path)
+}
+
+// PlayLoopForce — принудительно переключает на трек.
+func (p *Player) PlayLoopForce(path string) error {
 	if p.current != nil && p.track == path {
 		return nil
 	}
 	p.Stop()
+	return p.playInternal(path)
+}
 
+func (p *Player) playInternal(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("audio: read %s: %w", path, err)
@@ -43,9 +53,7 @@ func (p *Player) PlayLoop(path string) error {
 		return fmt.Errorf("audio: decode %s: %w", path, err)
 	}
 
-	// Бесконечный цикл.
 	loop := audio.NewInfiniteLoop(stream, stream.Length())
-
 	player, err := p.ctx.NewPlayer(loop)
 	if err != nil {
 		return fmt.Errorf("audio: new player: %w", err)
@@ -57,7 +65,6 @@ func (p *Player) PlayLoop(path string) error {
 	return nil
 }
 
-// Stop останавливает текущий трек.
 func (p *Player) Stop() {
 	if p.current != nil {
 		p.current.Pause()
@@ -67,7 +74,6 @@ func (p *Player) Stop() {
 	}
 }
 
-// SetVolume громкость 0..1.
 func (p *Player) SetVolume(v float64) {
 	if p.current == nil {
 		return
@@ -80,6 +86,3 @@ func (p *Player) SetVolume(v float64) {
 	}
 	p.current.SetVolume(v)
 }
-
-// ensure io не удалён линтером (используется косвенно).
-var _ = io.EOF

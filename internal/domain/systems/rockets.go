@@ -76,17 +76,6 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 			e.TakeDamage(damage)
 		}
 	}
-
-	// Турели — отдельная сущность, но в той же зоне.
-	for i := range w.Turrets {
-		t := &w.Turrets[i]
-		if t.IsDead() {
-			continue
-		}
-		if math.Hypot(t.X-x, t.Y-y) <= radius {
-			t.Damage(damage)
-		}
-	}
 }
 
 func StepExplosions(w *world.World) {

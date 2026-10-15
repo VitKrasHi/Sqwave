@@ -144,7 +144,6 @@ func placeTurretAt(w *world.World, e *world.Enemy, tx, ty float64) {
 		HP:           stats.TurretHP,
 		MaxHP:        stats.TurretHP,
 		Size:         stats.TurretSize,
-		Life:         stats.TurretLife,
 		DetectRange:  stats.TurretDetectRange,
 		ProjSpeed:    stats.TurretProjSpeed,
 		ProjSize:     stats.TurretProjSize,

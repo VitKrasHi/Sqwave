@@ -155,6 +155,7 @@ type SceneRenderer interface {
 	DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRGBA)
 	DrawScreenText(text string, x, y float64, c color.NRGBA)
 	DrawScreenTextScaled(text string, x, y, scale float64, c color.NRGBA)
+	DrawScreenImage(path string, x, y, w, h float64)
 
 	DrawText(text string, x, y float64)
 }

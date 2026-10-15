@@ -8,8 +8,6 @@ type Turret struct {
 	MaxHP int
 	Size  float64
 
-	Life int
-
 	// Один счётчик кулдауна + счётчик выстрелов в очереди.
 	Cooldown     int // тиков до следующего выстрела
 	CooldownMax  int // кулдаун между очередями

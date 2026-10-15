@@ -18,10 +18,12 @@ import (
 const aimLineLength = 90.0
 
 type Game struct {
-	world  *world.World
-	input  InputSource
-	camera *Camera
-	menu   Menu
+	world        *world.World
+	input        InputSource
+	camera       *Camera
+	menu         Menu
+	onPlayerDied func()
+	deathFired   bool
 
 	lastInput input.PlayerInput
 	ticks     int
@@ -29,6 +31,10 @@ type Game struct {
 	debugNav bool
 
 	music *audio.Player
+}
+
+func (g *Game) SetOnPlayerDied(f func()) {
+	g.onPlayerDied = f
 }
 
 func New(w *world.World, in InputSource, music *audio.Player) *Game {
@@ -96,6 +102,13 @@ func (g *Game) Update() error {
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
+
+	if !g.deathFired && g.world.Player.IsDead() {
+		g.deathFired = true
+		if g.onPlayerDied != nil {
+			g.onPlayerDied()
+		}
+	}
 
 	return nil
 }
@@ -749,4 +762,73 @@ func drawTurrets(r SceneRenderer, w *world.World) {
 			r.DrawRect(t.X-barW/2, y, barW*ratio, barH, ColorHPLow)
 		}
 	}
+}
+
+// DrawFrozen — рисует замороженный мир (без игрока и HUD).
+// Используется сценой смерти в первых фазах.
+func (g *Game) DrawFrozen(r SceneRenderer) {
+	w := g.world
+	r.SetCamera(g.camera.X, g.camera.Y, g.camera.Zoom)
+	r.Clear(ColorBackground)
+
+	for _, wall := range w.Walls {
+		r.DrawRect(wall.X, wall.Y, wall.W, wall.H, ColorWall)
+	}
+
+	drawSpawnZone(r, w, g.ticks)
+
+	for _, b := range w.Bullets {
+		alpha := uint8(int(255) * b.Life / b.MaxLife)
+		trail := bulletTrailColor(b.Weapon)
+		trail.A = alpha
+		r.DrawLine(b.StartX, b.StartY, b.EndX, b.EndY, 2, trail)
+		tip := bulletColor(b.Weapon)
+		tip.A = alpha
+		r.DrawRect(b.EndX-2, b.EndY-2, 4, 4, tip)
+	}
+
+	for _, rocket := range w.Rockets {
+		l := math.Hypot(rocket.VX, rocket.VY)
+		if l == 0 {
+			continue
+		}
+		tailLen := 14.0
+		tailX := rocket.X - rocket.VX/l*tailLen
+		tailY := rocket.Y - rocket.VY/l*tailLen
+		r.DrawLine(tailX, tailY, rocket.X, rocket.Y, 3, ColorRocketTrail)
+		r.DrawRect(rocket.X-rocket.Size/2, rocket.Y-rocket.Size/2, rocket.Size, rocket.Size, ColorRocketBullet)
+	}
+
+	for _, e := range w.Explosions {
+		progress := 1 - float64(e.Life)/float64(e.MaxLife)
+		radius := e.Radius * math.Min(progress*3, 1)
+		alpha := uint8(255 * (1 - progress))
+		c := ColorExplosion
+		c.A = alpha
+		r.DrawCircle(e.X, e.Y, radius, c)
+	}
+
+	for _, proj := range w.EnemyProjectiles {
+		r.DrawRect(proj.X, proj.Y, proj.Size, proj.Size, ColorEnemyProjectile)
+	}
+
+	for _, rk := range w.EnemyRockets {
+		l := math.Hypot(rk.VX, rk.VY)
+		if l > 0.01 {
+			tailX := rk.X - rk.VX/l*14
+			tailY := rk.Y - rk.VY/l*14
+			r.DrawLine(tailX, tailY, rk.X, rk.Y, 3, ColorEnemyRocketTrail)
+		}
+		r.DrawRect(rk.X-rk.Size/2, rk.Y-rk.Size/2, rk.Size, rk.Size, ColorEnemyRocket)
+	}
+
+	drawMedicBeams(r, w)
+	drawBufferBeams(r, w)
+	drawFleerCones(r, w)
+	drawSniperBeams(r, w)
+	drawTurrets(r, w)
+	drawEnemies(r, w)
+
+	// Игрока НЕТ — он исчез.
+	// HUD НЕТ — сцена смерти сама управляет экраном.
 }

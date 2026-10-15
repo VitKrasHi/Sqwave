@@ -12,13 +12,13 @@ func StepTurrets(w *world.World) {
 
 	for i := range w.Turrets {
 		t := &w.Turrets[i]
-		if t.IsDead() {
-			continue
+		if i == 0 {
+			println("turret: cd=", t.Cooldown, "cdmax=", t.CooldownMax,
+				"burst=", t.ShotsInBurst, "burstsize=", t.BurstSize,
+				"dist=", int(math.Hypot(pcx-t.X, pcy-t.Y)),
+				"detect=", int(t.DetectRange))
 		}
-
-		t.Life--
-		if t.Life <= 0 {
-			t.HP = 0
+		if t.IsDead() {
 			continue
 		}
 
