@@ -230,7 +230,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		}
 	}
 
-	// Ближайший враг до стены.
 	// Ближайший враг или турель до стены.
 	enemyT := wallT
 	var hitEnemy *world.Enemy
@@ -260,6 +259,22 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		}
 	}
 
+	// Гарпун (прицепленный к игроку) можно отстрелить.
+	var hitHarpoon *world.Harpoon
+	for i := range w.Harpoons {
+		hp := &w.Harpoons[i]
+		if hp.IsDead() || !hp.Attached {
+			continue
+		}
+		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, hp.Rect()); ok {
+			if tt < enemyT {
+				enemyT = tt
+				hitHarpoon = hp
+				hitEnemy = nil
+			}
+		}
+	}
+
 	endX := startX + (maxEndX-startX)*enemyT
 	endY := startY + (maxEndY-startY)*enemyT
 
@@ -268,6 +283,16 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 			// Попадание зарегистрировано визуально, но урона нет.
 		} else if BlocksDamageFrom(hitEnemy, startX, startY) {
 			// Урон заблокирован щитом танка.
+		} else if hitHarpoon != nil {
+			dmg := w.Player.Weapon.DamageAt(0, 1)
+			hitHarpoon.Damage(dmg)
+			if hitHarpoon.IsDead() {
+				p := &w.Player
+				if p.Harpooned && p.HarpoonID == hitHarpoon.ID {
+					p.Harpooned = false
+					p.HarpoonID = -1
+				}
+			}
 		} else {
 			distance := enemyT * weapon.Range
 			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)

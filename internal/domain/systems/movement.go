@@ -40,9 +40,24 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		}
 	}
 
-	// ⚠️ Если в захвате — не двигаемся, выходим из функции.
-	// Сбрасываем VelX/VelY, чтобы снайпер не «видел» движение.
-	if p.Held {
+	// Проверка гарпуна.
+	if p.Harpooned && p.HarpoonID != -1 {
+		// Валидность — гарпун ещё существует?
+		valid := false
+		for i := range w.Harpoons {
+			if w.Harpoons[i].ID == p.HarpoonID && !w.Harpoons[i].IsDead() {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			p.Harpooned = false
+			p.HarpoonID = -1
+		}
+	}
+
+	// Обездвижен гарпуном или захватом — блокируем движение.
+	if p.Held || p.Harpooned {
 		p.DashTimer = 0
 		p.VelX = 0
 		p.VelY = 0

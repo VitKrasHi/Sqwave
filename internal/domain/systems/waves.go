@@ -306,6 +306,12 @@ func spawnOneFromGroup(w *world.World) {
 		ws.Composition.Protector++
 	case world.EnemyTank:
 		ws.Composition.Tank++
+	case world.EnemyMachineGunner:
+		ws.Composition.MachineGunner++
+	case world.EnemySummoner:
+		ws.Composition.Summoner++
+	case world.EnemyHarpooner:
+		ws.Composition.Harpooner++
 	}
 
 	ws.GroupRemaining--
@@ -444,6 +450,12 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemyProtector
 	case world.MapTestTank:
 		t = world.EnemyTank
+	case world.MapTestMachineGunner:
+		t = world.EnemyMachineGunner
+	case world.MapTestSummoner:
+		t = world.EnemySummoner
+	case world.MapTestHarpooner:
+		t = world.EnemyHarpooner
 	default:
 		return
 	}

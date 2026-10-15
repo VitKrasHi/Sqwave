@@ -16,6 +16,7 @@ type World struct {
 	Explosions       []Explosion
 	EnemyProjectiles []EnemyProjectile
 	EnemyRockets     []EnemyRocket
+	Harpoons         []Harpoon
 	Walls            []geometry.Rect
 	SpawnZone        geometry.Rect
 	Rng              *rand.Rand
@@ -23,6 +24,9 @@ type World struct {
 	Wave             WaveState
 	SpatialHash      *SpatialHash
 	EnemyOccupancy   []bool
+	NextSummonerID   int
+	NextHarpoonID    int
+	NextEnemyUID     int
 }
 
 type Options struct {
@@ -48,6 +52,9 @@ const (
 	MapTestFlamer
 	MapTestProtector
 	MapTestTank
+	MapTestMachineGunner
+	MapTestSummoner
+	MapTestHarpooner
 )
 
 func New() *World {
@@ -258,4 +265,19 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 		}
 	}
 	return w
+}
+
+func (w *World) AllocSummonerID() int {
+	w.NextSummonerID++
+	return w.NextSummonerID
+}
+
+func (w *World) AllocHarpoonID() int {
+	w.NextHarpoonID++
+	return w.NextHarpoonID
+}
+
+func (w *World) AllocEnemyUID() int {
+	w.NextEnemyUID++
+	return w.NextEnemyUID
 }

@@ -181,6 +181,36 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawRect(rk.X-rk.Size/2, rk.Y-rk.Size/2, rk.Size, rk.Size, ColorEnemyRocket)
 	}
 
+	for _, hp := range w.Harpoons {
+		if hp.IsDead() {
+			continue
+		}
+
+		// След за гарпуном — от позиции минус скорость × N.
+		if !hp.Attached {
+			trailLen := 30.0
+			speed := math.Hypot(hp.VX, hp.VY)
+			if speed > 0.01 {
+				tx := hp.X - hp.VX/speed*trailLen
+				ty := hp.Y - hp.VY/speed*trailLen
+				r.DrawLine(tx, ty, hp.X, hp.Y, 3, ColorHarpoonChain)
+			}
+		}
+
+		// Тело наконечника.
+		r.DrawRect(hp.X-hp.Size/2, hp.Y-hp.Size/2, hp.Size, hp.Size, ColorHarpoonBody)
+
+		// Верёвка от гарпуна к владельцу (по UID).
+		for i := range w.Enemies {
+			owner := &w.Enemies[i]
+			if owner.UniqueID == hp.OwnerUID && !owner.IsDead() {
+				ox, oy := owner.Center()
+				r.DrawLine(hp.X, hp.Y, ox, oy, 2, ColorHarpoonChain)
+				break
+			}
+		}
+	}
+
 	if g.debugNav {
 		drawNavDebug(r, w)
 	}
@@ -476,6 +506,14 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorProtector
 		case world.EnemyTank:
 			c = ColorTank
+		case world.EnemyMachineGunner:
+			c = ColorMachineGunner
+		case world.EnemySummoner:
+			c = ColorSummoner
+		case world.EnemyGhost:
+			c = ColorGhost
+		case world.EnemyHarpooner:
+			c = ColorHarpooner
 		default:
 			c = ColorEnemy
 		}
@@ -581,6 +619,33 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 				r.DrawCircle(cx, cy, rad, pulse)
 				r.DrawCircle(cx, cy, rad, ColorTankHammerWind)
 			}
+		}
+
+		if e.Type == world.EnemyMachineGunner {
+			cx, cy := e.Center()
+			barrelLen := stats.Size * 0.9
+			bx := cx + math.Cos(e.WeaponAngle)*barrelLen
+			by := cy + math.Sin(e.WeaponAngle)*barrelLen
+			r.DrawLine(cx, cy, bx, by, 5, ColorMGBarrel)
+		}
+
+		if e.Type == world.EnemyGhost && e.AttackTimer > 40 {
+			cx, cy := e.Center()
+			pcx, pcy := w.Player.Center()
+			ang := math.Atan2(pcy-cy, pcx-cx)
+			r.DrawLine(cx, cy,
+				cx+math.Cos(ang)*14,
+				cy+math.Sin(ang)*14,
+				3, ColorGhostShield)
+		}
+
+		if e.Type == world.EnemyHarpooner && e.HarpoonAiming {
+			cx, cy := e.Center()
+			progress := 1.0 - float64(e.HarpoonAimTimer)/float64(e.Type.Stats().HarpoonAimTime)
+			alpha := uint8(40 + 120*progress)
+			cAim := ColorHarpoonAim
+			cAim.A = alpha
+			r.DrawLine(cx, cy, e.HarpoonAimTargetX, e.HarpoonAimTargetY, 1.5, cAim)
 		}
 
 		// Взгляд — короткий штрих из центра.

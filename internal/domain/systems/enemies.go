@@ -12,6 +12,12 @@ import (
 const maxAStarPerTick = 4
 
 func StepEnemies(w *world.World) {
+	// Присваиваем UID новым врагам.
+	for i := range w.Enemies {
+		if w.Enemies[i].UniqueID == 0 {
+			w.Enemies[i].UniqueID = w.AllocEnemyUID()
+		}
+	}
 	// 1. Пересобрать spatial hash.
 	if w.SpatialHash != nil {
 		w.SpatialHash.Clear()
@@ -48,7 +54,9 @@ func StepEnemies(w *world.World) {
 			continue
 		}
 
-		depenetrate(w, e)
+		if e.Type != world.EnemyGhost {
+			depenetrate(w, e)
+		}
 
 		if e.HP < e.LastHP {
 			e.RecentlyHitTimer = 60
@@ -114,6 +122,14 @@ func StepEnemies(w *world.World) {
 			stepProtector(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyTank:
 			stepTank(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyMachineGunner:
+			stepMachineGunner(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemySummoner:
+			stepSummoner(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyGhost:
+			stepGhost(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemyHarpooner:
+			stepHarpooner(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 
@@ -143,11 +159,26 @@ func StepEnemies(w *world.World) {
 	applySeparation(w)
 
 	// 4. Удаление мёртвых.
-	alive := w.Enemies[:0]
-	for _, e := range w.Enemies {
-		if !e.IsDead() {
-			alive = append(alive, e)
+	// Собираем ID мёртвых призывателей.
+	deadSummoners := map[int]bool{}
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() && e.Type == world.EnemySummoner && e.SummonerID != 0 {
+			deadSummoners[e.SummonerID] = true
 		}
+	}
+
+	// Удаляем мёртвых + призраков мёртвых призывателей.
+	alive := w.Enemies[:0]
+	for i := range w.Enemies {
+		e := w.Enemies[i]
+		if e.IsDead() {
+			continue
+		}
+		if e.Type == world.EnemyGhost && deadSummoners[e.OwnerSummonerID] {
+			continue // призыватель умер — призрак исчезает
+		}
+		alive = append(alive, e)
 	}
 	w.Enemies = alive
 }

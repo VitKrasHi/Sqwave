@@ -56,6 +56,12 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Tank > 0 {
 		lines = append(lines, line{"Tank", comp.Tank, ColorTank})
 	}
+	if comp.MachineGunner > 0 {
+		lines = append(lines, line{"MachineGunner", comp.MachineGunner, ColorMachineGunner})
+	}
+	if comp.Summoner > 0 {
+		lines = append(lines, line{"Summoner", comp.Summoner, ColorSummoner})
+	}
 
 	const (
 		panelW  = 260.0
@@ -131,6 +137,12 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if w.Player.IsBurning() {
 		r.DrawScreenTextScaled("BURNING", 8, 80, 1.4,
 			color.NRGBA{R: 255, G: 120, B: 40, A: 255})
+	}
+
+	if w.Player.Harpooned {
+		r.DrawScreenTextScaled("HARPOONED - SHOOT THE CHAIN",
+			8, float64(world.ScreenHeight)-120, 1.4,
+			color.NRGBA{R: 255, G: 200, B: 60, A: 255})
 	}
 
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {

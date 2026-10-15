@@ -18,6 +18,10 @@ const (
 	EnemyFlamer
 	EnemyProtector
 	EnemyTank
+	EnemyMachineGunner
+	EnemySummoner
+	EnemyGhost
+	EnemyHarpooner
 )
 
 type EnemyStats struct {
@@ -118,6 +122,36 @@ type EnemyStats struct {
 	HammerDamage       int
 	HammerCooldown     int
 	SupportCoverRange  float64
+
+	// Пулемётчик.
+	MGMaxDamage   int     // урон в упор
+	MGMinDamage   int     // урон на максимальной дистанции
+	MGBurstCount  int     // выстрелов в очереди
+	MGBurstGap    int     // тиков между выстрелами в очереди
+	MGCooldown    int     // тиков между очередями
+	MGPredictLead float64 // 0..1, доля опережения по скорости игрока
+	MGSpreadDeg   float64 // разброс в градусах на выстрел
+
+	// Призыватель.
+	SummonCooldown int
+	SummonCountMin int
+	SummonCountMax int
+	SummonRange    float64
+
+	// Призрак.
+	GhostContactDamage int
+	GhostContactRange  float64
+	GhostContactCool   int
+
+	// Гарпунист.
+	HarpoonAimTime    int
+	HarpoonSpeed      float64
+	HarpoonSize       float64
+	HarpoonLife       int
+	HarpoonHP         int
+	HarpoonPullSpeed  float64
+	HarpoonCooldown   int
+	HarpoonAttachDist float64
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -325,6 +359,75 @@ var enemyStats = map[EnemyType]EnemyStats{
 		HammerCooldown:     90, // 1.5 сек между ударами
 		SupportCoverRange:  400,
 	},
+	EnemyMachineGunner: {
+		Name:         "MachineGunner",
+		MaxHP:        500,
+		SP:           50,
+		Size:         28,
+		PreferredMin: 150, // ближе — в упор, максимальный урон
+		PreferredMax: 450, // дальше — минимальный урон
+
+		WeaponTurnRate:   0.05,
+		WeaponArcDegrees: 20,
+
+		ProjectileSpeed: 14,
+		ProjectileSize:  5,
+		ProjectileLife:  45,
+		ProjectileCount: 1,
+
+		MGMaxDamage:   25, // в упор
+		MGMinDamage:   6,  // на пределе
+		MGBurstCount:  6,  // 6 выстрелов в очереди
+		MGBurstGap:    3,  // очень быстро
+		MGCooldown:    90, // 1.5 сек между очередями
+		MGPredictLead: 0.75,
+		MGSpreadDeg:   4,
+
+		SupportCoverRange: 400,
+	},
+	EnemySummoner: {
+		Name:         "Summoner",
+		MaxHP:        400,
+		SP:           70,
+		Size:         26,
+		PreferredMin: 80,
+		PreferredMax: 400,
+
+		SummonCooldown: 1200, // 5 сек между призывами
+		SummonCountMin: 3,
+		SummonCountMax: 5,
+		SummonRange:    60, // радиус, в котором появляются призраки
+	},
+	EnemyGhost: {
+		Name:  "Ghost",
+		MaxHP: 50,
+		SP:    100,
+		Size:  20,
+
+		GhostContactDamage: 20,
+		GhostContactRange:  40,
+		GhostContactCool:   45, // 0.75 сек между ударами
+	},
+	EnemyHarpooner: {
+		Name:         "Harpooner",
+		MaxHP:        200,
+		SP:           150,
+		Size:         24,
+		PreferredMin: 350,
+		PreferredMax: 700,
+
+		WeaponTurnRate:   0.04,
+		WeaponArcDegrees: 15,
+
+		HarpoonAimTime:    90, // 1.5 сек выцеливает
+		HarpoonSpeed:      5,  // быстро летит
+		HarpoonSize:       12,
+		HarpoonLife:       240,
+		HarpoonHP:         30,  // чтобы отстрелить
+		HarpoonPullSpeed:  1.2, // насколько быстро тянет игрока
+		HarpoonCooldown:   240, // 4 сек после промаха/разрыва
+		HarpoonAttachDist: 22,  // на каком расстоянии от игрока висит гарпун
+	},
 }
 
 const (
@@ -460,6 +563,27 @@ type Enemy struct {
 	HammerState    int // 0 idle, 1 windup
 	HammerTimer    int
 	HammerCooldown int
+
+	// Пулемётчик.
+	MGBurstLeft    int
+	MGBurstTimer   int
+	MGCooldownLeft int
+
+	// Призыватель.
+	SummonCooldown int
+	SummonerID     int // уникальный ID этого призывателя
+
+	// Призрак.
+	OwnerSummonerID int // к какому призывателю принадлежит
+
+	// Гарпунист.
+	HarpoonAiming     bool
+	HarpoonAimTimer   int
+	HarpoonCooldown   int
+	HarpoonAimTargetX float64
+	HarpoonAimTargetY float64
+	// Уникальный идентификатор врага (не меняется при удалении соседей).
+	UniqueID int
 
 	GroupID int
 	// Множители сложности (для timer wave). 0 = 1.0 (база).

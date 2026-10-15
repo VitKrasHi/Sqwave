@@ -3,26 +3,29 @@ package world
 import "Sqwave/internal/domain/geometry"
 
 type WaveComposition struct {
-	Infantry  int
-	Shooter   int
-	Scout     int
-	Medic     int
-	Rammer    int
-	Sniper    int
-	Rocketeer int
-	Buffer    int
-	Fleer     int
-	Engineer  int
-	Flamer    int
-	Protector int
-	Tank      int
+	Infantry      int
+	Shooter       int
+	Scout         int
+	Medic         int
+	Rammer        int
+	Sniper        int
+	Rocketeer     int
+	Buffer        int
+	Fleer         int
+	Engineer      int
+	Flamer        int
+	Protector     int
+	Tank          int
+	MachineGunner int
+	Summoner      int
+	Harpooner     int
 }
 
 func (c WaveComposition) Total() int {
 	return c.Infantry + c.Shooter + c.Scout + c.Medic +
 		c.Rammer + c.Sniper + c.Rocketeer + c.Buffer +
 		c.Fleer + c.Engineer + c.Flamer + c.Protector +
-		c.Tank
+		c.Tank + c.MachineGunner + c.Summoner + c.Harpooner
 }
 
 type WaveKind int
@@ -98,7 +101,7 @@ func WaveSizeFor(n, base int, rng intRng) int {
 
 // RandomEnemyType — равновероятный выбор типа врага.
 func RandomEnemyType(rng intRng) EnemyType {
-	switch rng.Intn(13) {
+	switch rng.Intn(16) { // 16 базовых типов (Ghost не спавнится сам)
 	case 0:
 		return EnemyInfantry
 	case 1:
@@ -123,8 +126,14 @@ func RandomEnemyType(rng intRng) EnemyType {
 		return EnemyFlamer
 	case 11:
 		return EnemyProtector
-	default:
+	case 12:
 		return EnemyTank
+	case 13:
+		return EnemyMachineGunner
+	case 14:
+		return EnemySummoner
+	default:
+		return EnemyHarpooner
 	}
 }
 
@@ -172,6 +181,15 @@ func RandomEnemyTypeTimer(progress float64, rng intRng) EnemyType {
 	}
 	if progress > 1 {
 		pool = append(pool, EnemyTank)
+	}
+	if progress > 1 {
+		pool = append(pool, EnemyMachineGunner)
+	}
+	if progress > 1 {
+		pool = append(pool, EnemySummoner)
+	}
+	if progress > 1 {
+		pool = append(pool, EnemyHarpooner)
 	}
 
 	return pool[rng.Intn(len(pool))]

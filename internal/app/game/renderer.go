@@ -115,6 +115,20 @@ var (
 	ColorTankShieldFill = color.NRGBA{R: 160, G: 180, B: 220, A: 50}
 	ColorTankHammer     = color.NRGBA{R: 200, G: 80, B: 40, A: 255}
 	ColorTankHammerWind = color.NRGBA{R: 255, G: 140, B: 60, A: 200}
+
+	ColorMachineGunner    = color.NRGBA{R: 60, G: 110, B: 90, A: 255}
+	ColorMachineGunnerHot = color.NRGBA{R: 100, G: 200, B: 140, A: 255}
+	ColorMGBarrel         = color.NRGBA{R: 160, G: 220, B: 180, A: 255}
+
+	ColorSummoner    = color.NRGBA{R: 140, G: 60, B: 180, A: 255}
+	ColorGhost       = color.NRGBA{R: 200, G: 200, B: 255, A: 140}
+	ColorGhostCore   = color.NRGBA{R: 220, G: 220, B: 255, A: 200}
+	ColorGhostShield = color.NRGBA{R: 220, G: 220, B: 255, A: 180}
+
+	ColorHarpooner    = color.NRGBA{R: 200, G: 170, B: 60, A: 255}
+	ColorHarpoonBody  = color.NRGBA{R: 220, G: 200, B: 120, A: 255}
+	ColorHarpoonChain = color.NRGBA{R: 180, G: 140, B: 60, A: 220}
+	ColorHarpoonAim   = color.NRGBA{R: 255, G: 220, B: 80, A: 120}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

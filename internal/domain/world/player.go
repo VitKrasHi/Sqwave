@@ -45,6 +45,10 @@ type Player struct {
 	BurnTimer int // оставшиеся тики горения
 	BurnTick  int // накопитель до следующего тика урона
 
+	// Гарпун.
+	Harpooned bool
+	HarpoonID int // ID гарпуна, к которому притянут (-1 если нет)
+
 	IsFiring bool
 }
 
