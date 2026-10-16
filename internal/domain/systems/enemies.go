@@ -95,6 +95,30 @@ func StepEnemies(w *world.World) {
 		}
 		e.LastX, e.LastY = e.X, e.Y
 
+		// Если враг целится в спавн — ведём его туда.
+		if e.TargetSpawnIdx >= 0 && e.TargetSpawnIdx < len(w.SpawnPoints) {
+			sp := &w.SpawnPoints[e.TargetSpawnIdx]
+			if !sp.IsDead() {
+				ecx, ecy := e.Center()
+				scx, scy := sp.Center()
+				d := math.Hypot(scx-ecx, scy-ecy)
+
+				if d > defendSpawnAttackRange*0.8 {
+					// Двигаемся к спавну.
+					if hasLineOfSight(w, ecx, ecy, scx, scy) {
+						moveEnemyDirect(w, e, ecx, ecy, scx, scy)
+					} else {
+						moveEnemyViaPath(w, e, ecx, ecy, scx, scy)
+					}
+					continue // пропускаем обычный AI
+				}
+				// В радиусе — стоим и атакуем.
+				continue
+			}
+			// Спавн мёртв — сбрасываем цель, идём на игрока.
+			e.TargetSpawnIdx = -1
+		}
+
 		switch e.Type {
 		case world.EnemyInfantry:
 			stepInfantry(w, e, ecx, ecy, pcx, pcy, dist)

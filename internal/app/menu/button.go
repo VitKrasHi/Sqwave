@@ -36,7 +36,7 @@ func (b *Button) Draw(r game.SceneRenderer, selected bool) {
 
 	// Метка по центру кнопки (примерно).
 	textScale := 1.8
-	r.DrawScreenTextScaled(b.Label, b.X+18, b.Y+b.H/2-24, textScale, text)
+	r.DrawScreenTextScaled(b.Label, b.X+18, b.Y+b.H/2-30, textScale, text)
 
 	// Маркер выбора слева от кнопки.
 	if selected {

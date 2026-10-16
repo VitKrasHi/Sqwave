@@ -7,6 +7,7 @@ type WaveKind int
 const (
 	WaveKindCommon WaveKind = iota
 	WaveKindTimer
+	WaveKindDefend
 )
 
 // Ограничения на поддержку.
@@ -69,6 +70,9 @@ type WaveState struct {
 	// Лимиты поддержки.
 	WaveSupports  int // сколько поддержки уже заспавнено в этой волне
 	GroupSupports int // сколько поддержки уже заспавнено в текущей группе
+	// Лимит снайперов за волну.
+	WaveSnipers    int
+	MaxWaveSnipers int
 
 	PauseTimer int
 	Active     bool
@@ -77,6 +81,12 @@ type WaveState struct {
 	TimerTotal         int
 	TimerRemaining     int
 	TimerGroupCooldown int // тиков до следующей группы
+
+	// Defend-волна.
+	DefendSpawnCount  int  // сколько спавнов в этой волне
+	DefendSpawnsAlive int  // сколько ещё живо
+	DefendOutcome     int  // 0=в процессе, 1=победа, -1=поражение
+	DefendPenalty     bool // штрафная группа уже спавнена
 }
 
 func (ws *WaveState) IsVictory() bool {
@@ -288,4 +298,50 @@ func TimerGroupSizeRangeFor(level int) (int, int) {
 		return 30, 60
 	}
 	return 20, 40
+}
+
+// DefendSpawnCountFor — сколько спавнов защищать игроку.
+func DefendSpawnCountFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 1
+	case 3, 4:
+		return 2
+	case 5:
+		return 3
+	}
+	return 1
+}
+
+// DefendSpawnHPFor — HP одного спавна.
+func DefendSpawnHPFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 600
+	case 3, 4:
+		return 900
+	case 5:
+		return 1200
+	}
+	return 600
+}
+
+// DefendTrackForLevel — трек для defend-волны.
+func DefendTrackForLevel(level int) string {
+	switch level {
+	case 1, 2:
+		// Два трека на выбор — 50/50.
+		return "assets/music/necro_syncrosis.wav" // выбор на месте
+	case 3, 4:
+		return "assets/music/twisted.wav"
+	case 5:
+		return "assets/music/dark_subconscious.wav"
+	}
+	return ""
+}
+
+// SniperLimitFor — сколько снайперов максимум за волну.
+// Возвращает 3..5 случайно.
+func SniperLimitFor(rng intRng) int {
+	return 3 + rng.Intn(3) // 3, 4 или 5
 }

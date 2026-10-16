@@ -273,7 +273,7 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 	r.DrawScreenRect(px+40, py+86, panelW-80, 2,
 		color.NRGBA{R: 60, G: 80, B: 110, A: 200})
 
-	wavesValue := "∞ (endless)"
+	wavesValue := "0 (endless)"
 	if s.settings.WavesLimit > 0 {
 		wavesValue = fmt.Sprintf("%d", s.settings.WavesLimit)
 	}
@@ -285,7 +285,7 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 	s.drawButton(r, rowStart, "Start")
 	s.drawButton(r, rowBack, "Back")
 
-	r.DrawScreenText("↑/↓ select   ←/→ change   Enter confirm   Esc back",
+	r.DrawScreenText("UP/DOWN select   LEFT/RIGHT change   Enter confirm   Esc back",
 		px+40, py+panelH-30, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
 }
 

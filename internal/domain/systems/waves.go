@@ -28,6 +28,14 @@ func StepWaves(w *world.World) {
 		stepTimerWave(w)
 		return
 	}
+	if ws.Kind == world.WaveKindDefend {
+		StepDefendObjectives(w) // проверяет win/lose, обновляет приоритеты
+		if !ws.Active {
+			return
+		}
+		stepDefendWave(w)
+		return
+	}
 	stepCommonWave(w)
 }
 
@@ -121,11 +129,7 @@ func spawnTimerGroup(w *world.World) {
 func spawnOneTimerGroupMember(w *world.World) {
 	ws := &w.Wave
 
-	// Лимит поддержки на группу и мягкий общий лимит.
-	allowSupport := ws.GroupSupports < world.MaxSupportsPerGroup &&
-		ws.WaveSupports < world.MaxSupportsPerWave*3
-
-	t := world.RandomEnemyTypeForWave(ws.WaveLevel, allowSupport, w.Rng)
+	t := pickWaveEnemy(w, ws)
 
 	pos, ok := findFreeSpotNear(w, ws.GroupOriginX, ws.GroupOriginY, 120)
 	if !ok {
@@ -135,11 +139,16 @@ func spawnOneTimerGroupMember(w *world.World) {
 
 	e := world.NewEnemy(t, pos.X, pos.Y)
 	e.GroupID = ws.GroupID
+	e.OriginalTargetSpawn = -1
+	e.TargetSpawnIdx = -1
 	w.Enemies = append(w.Enemies, e)
 
 	if world.IsSupportType(t) {
 		ws.WaveSupports++
 		ws.GroupSupports++
+	}
+	if t == world.EnemySniper {
+		ws.WaveSnipers++
 	}
 
 	switch t {
@@ -200,13 +209,20 @@ func startWave(w *world.World) {
 	ws.GroupRemaining = 0
 	ws.GroupSpawnTimer = 0
 	ws.WaveSupports = 0
+	ws.WaveSnipers = 0
+	ws.MaxWaveSnipers = world.SniperLimitFor(w.Rng)
 	ws.GroupSupports = 0
+	ws.DefendOutcome = 0
+	ws.DefendPenalty = false
 
-	// 50/50 common или timer.
-	if w.Rng.Intn(2) == 0 {
+	// 1/3 Common, 1/3 Timer, 1/3 Defend.
+	switch w.Rng.Intn(3) {
+	case 0:
 		startCommonWave(w)
-	} else {
+	case 1:
 		startTimerWave(w)
+	default:
+		startDefendWave(w)
 	}
 }
 
@@ -244,6 +260,33 @@ func startTimerWave(w *world.World) {
 	}
 
 	spawnTimerGroup(w)
+}
+
+func startDefendWave(w *world.World) {
+	ws := &w.Wave
+	ws.Kind = world.WaveKindDefend
+	ws.WaveSize = world.WaveSizeFor(ws.WaveLevel, ws.BaseWaveSize, w.Rng)
+	ws.GroupsTotal = world.GroupCountFor(ws.WaveLevel, w.Rng)
+	ws.GroupsRemaining = ws.GroupsTotal
+	ws.TimerTotal = 0
+	ws.TimerRemaining = 0
+	ws.TimerGroupCooldown = 0
+
+	spawnCount := world.DefendSpawnCountFor(ws.WaveLevel)
+	spawnHP := world.DefendSpawnHPFor(ws.WaveLevel)
+	spawnSpawnsForWave(w, spawnCount, spawnHP)
+	ws.DefendSpawnCount = len(w.SpawnPoints)
+	ws.DefendSpawnsAlive = len(w.SpawnPoints)
+
+	// Трек.
+	var track string
+	track = world.DefendTrackForLevel(ws.WaveLevel)
+
+	if track != "" {
+		w.PendingTrack = track
+	}
+
+	startGroup(w)
 }
 
 func startGroup(w *world.World) {
@@ -284,10 +327,7 @@ func startGroup(w *world.World) {
 func spawnOneFromGroup(w *world.World) {
 	ws := &w.Wave
 
-	allowSupport := ws.WaveSupports < world.MaxSupportsPerWave &&
-		ws.GroupSupports < world.MaxSupportsPerGroup
-
-	t := world.RandomEnemyTypeForWave(ws.WaveLevel, allowSupport, w.Rng)
+	t := pickWaveEnemy(w, ws)
 
 	pos, ok := findFreeSpotNear(w, ws.GroupOriginX, ws.GroupOriginY, 120)
 	if !ok {
@@ -297,11 +337,29 @@ func spawnOneFromGroup(w *world.World) {
 
 	e := world.NewEnemy(t, pos.X, pos.Y)
 	e.GroupID = ws.GroupID
+
+	if ws.Kind == world.WaveKindDefend && len(w.SpawnPoints) > 0 {
+		if w.Rng.Intn(100) < 25 {
+			idx := pickNearestSpawnAt(w, e.X, e.Y)
+			e.OriginalTargetSpawn = idx
+			e.TargetSpawnIdx = idx
+		} else {
+			e.OriginalTargetSpawn = -1
+			e.TargetSpawnIdx = -1
+		}
+	} else {
+		e.OriginalTargetSpawn = -1
+		e.TargetSpawnIdx = -1
+	}
+
 	w.Enemies = append(w.Enemies, e)
 
 	if world.IsSupportType(t) {
 		ws.WaveSupports++
 		ws.GroupSupports++
+	}
+	if t == world.EnemySniper {
+		ws.WaveSnipers++
 	}
 
 	switch t {
@@ -342,7 +400,6 @@ func spawnOneFromGroup(w *world.World) {
 	ws.GroupRemaining--
 	ws.SpawnedCount++
 }
-
 func pickGroupOrigin(w *world.World) (float64, float64) {
 	pcx, pcy := w.Player.Center()
 
@@ -490,4 +547,87 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 	for _, p := range points {
 		w.Enemies = append(w.Enemies, world.NewEnemy(t, p.x, p.y))
 	}
+}
+
+func pickNearestSpawnAt(w *world.World, x, y float64) int {
+	best := -1
+	bestD := math.Inf(1)
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() {
+			continue
+		}
+		scx, scy := sp.Center()
+		d := math.Hypot(scx-x, scy-y)
+		if d < bestD {
+			bestD = d
+			best = i
+		}
+	}
+	return best
+}
+
+func stepDefendWave(w *world.World) {
+	ws := &w.Wave
+
+	// Штрафная группа при уничтожении спавна.
+	if !ws.DefendPenalty {
+		for i := range w.SpawnPoints {
+			if w.SpawnPoints[i].IsDead() {
+				ws.DefendPenalty = true
+				// 20 дополнительных врагов целевых на спавны.
+				spawnPenaltyGroup(w, 20)
+				break
+			}
+		}
+	}
+
+	stepCommonWave(w) // базовая логика: спавн групп, паузы
+}
+
+func spawnPenaltyGroup(w *world.World, count int) {
+	ws := &w.Wave
+	for i := 0; i < count; i++ {
+		t := pickWaveEnemy(w, ws)
+		pos, ok := findFreeSpotNear(w,
+			w.Player.X+w.Rng.Float64()*800-400,
+			w.Player.Y+w.Rng.Float64()*800-400,
+			200)
+		if !ok {
+			continue
+		}
+		e := world.NewEnemy(t, pos.X, pos.Y)
+		e.GroupID = ws.GroupID
+		idx := pickNearestSpawnAt(w, e.X, e.Y)
+		e.OriginalTargetSpawn = idx
+		e.TargetSpawnIdx = idx
+		w.Enemies = append(w.Enemies, e)
+
+		if world.IsSupportType(t) {
+			ws.WaveSupports++
+		}
+		if t == world.EnemySniper {
+			ws.WaveSnipers++
+		}
+		ws.SpawnedCount++
+	}
+}
+
+// pickWaveEnemy — единая точка выбора врага для любой волны.
+// Учитывает лимит поддержки и лимит снайперов.
+// Возвращает выбранный тип — БЕЗ инкремента счётчиков,
+// это делается вызывающей стороной.
+func pickWaveEnemy(w *world.World, ws *world.WaveState) world.EnemyType {
+	allowSupport := ws.WaveSupports < world.MaxSupportsPerWave &&
+		ws.GroupSupports < world.MaxSupportsPerGroup
+	allowSniper := ws.WaveSnipers < ws.MaxWaveSnipers
+
+	for attempt := 0; attempt < 12; attempt++ {
+		t := world.RandomEnemyTypeForWave(ws.WaveLevel, allowSupport, w.Rng)
+		if t == world.EnemySniper && !allowSniper {
+			continue
+		}
+		return t
+	}
+	return world.EnemyInfantry
 }

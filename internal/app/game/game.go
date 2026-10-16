@@ -28,7 +28,8 @@ type Game struct {
 	lastInput input.PlayerInput
 	ticks     int
 
-	debugNav bool
+	debugNav   bool
+	hudVisible bool
 
 	music *audio.Player
 }
@@ -62,6 +63,9 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
 		g.debugNav = !g.debugNav
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
+		g.hudVisible = !g.hudVisible
 	}
 
 	in := g.input.Poll()
@@ -117,6 +121,13 @@ func (g *Game) Update() error {
 		if g.onPlayerDied != nil {
 			g.onPlayerDied()
 		}
+	}
+
+	// Defend: если все спавны уничтожены — игрок проигрывает.
+	if g.world.Wave.Kind == world.WaveKindDefend &&
+		g.world.Wave.DefendOutcome == -1 &&
+		!g.world.Player.IsDead() {
+		g.world.Player.TakeDamage(999999)
 	}
 
 	return nil
@@ -223,6 +234,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		drawNavDebug(r, w)
 	}
 
+	drawPlayerSpawns(r, w)
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
@@ -261,18 +273,60 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 	}
 
-	// HUD.
-	r.DrawText("Sqwave — WASD move, Space dash, LMB fire, Q swap, E menu", 8, 8)
-	r.DrawText(formatLoadout(&w.Player), 8, 24)
-	if p.IsAiming() {
-		r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
+	// Критические статусы игрока — всегда видны, даже с выключенным HUD.
+	if w.Player.Held {
+		r.DrawScreenTextScaled("!! CAUGHT !!", 8, float64(world.ScreenHeight)-90, 2.0,
+			color.NRGBA{R: 255, G: 60, B: 80, A: 255})
 	}
-	if w.PlayerInSpawnZone() && !g.menu.Open {
-		r.DrawScreenText("[E] choose weapon", 8, 60, ColorSpawnZone)
+	if w.Player.IsBurning() {
+		r.DrawScreenTextScaled("BURNING", 8, 80, 1.4,
+			color.NRGBA{R: 255, G: 120, B: 40, A: 255})
+	}
+	if w.Player.Harpooned {
+		r.DrawScreenTextScaled("HARPOONED - SHOOT THE CHAIN",
+			8, float64(world.ScreenHeight)-120, 1.4,
+			color.NRGBA{R: 255, G: 200, B: 60, A: 255})
 	}
 
-	drawHPBar(r, p.CurrentHP(), p.MaxHP())
-	drawWavePanel(r, w)
+	// HUD — рисуется только если включён.
+	if g.hudVisible {
+		// Подсказки.
+		r.DrawText("Sqwave — WASD move, Space dash, LMB fire, Q swap, E menu, F11 fullscreen, Tab HUD", 8, 8)
+		r.DrawText(formatLoadout(&w.Player), 8, 24)
+		if p.IsAiming() {
+			r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
+		}
+		if w.PlayerInSpawnZone() && !g.menu.Open {
+			r.DrawScreenText("[E] choose weapon", 8, 60, ColorSpawnZone)
+		}
+
+		drawHPBar(r, p.CurrentHP(), p.MaxHP())
+		drawWavePanel(r, w)
+
+		// Индикатор установки турели.
+		engineerSettingUp := false
+		for i := range w.Enemies {
+			e := &w.Enemies[i]
+			if e.Type == world.EnemyEngineer && e.TurretSetupTimer > 0 {
+				engineerSettingUp = true
+				break
+			}
+		}
+		if engineerSettingUp {
+			r.DrawScreenTextScaled("ENGINEER SETTING UP TURRET",
+				8, float64(world.ScreenHeight)-150, 1.6,
+				color.NRGBA{R: 255, G: 100, B: 100, A: 255})
+		}
+	}
+
+	if !g.hudVisible {
+		r.DrawScreenText("[Tab] show HUD", 8, 8, ColorMenuDim)
+	}
+
+	// Меню всегда поверх HUD.
+	if g.menu.Open {
+		drawMenu(r, &g.menu, p)
+	}
 
 	if p.IsBurning() {
 		intensity := float64(p.BurnTimer) / 600
@@ -284,10 +338,6 @@ func (g *Game) Draw(r SceneRenderer) {
 		c := ColorBurnOverlay
 		c.A = alpha
 		r.DrawScreenRect(0, 0, float64(world.ScreenWidth), float64(world.ScreenHeight), c)
-	}
-
-	if g.menu.Open {
-		drawMenu(r, &g.menu, p)
 	}
 }
 
@@ -380,41 +430,6 @@ func drawThrust(r SceneRenderer, p *world.Player, pcx, pcy float64) {
 	size := p.Swing.Weapon.Stats().BladeWidth
 	size *= 1.0 + 0.15*reach
 	r.DrawRect(hx-size/2, hy-size/2, size, size, ColorShield)
-}
-
-func drawHPBar(r SceneRenderer, hp, maxHP int) {
-	const (
-		barW = 220.0
-		barH = 18.0
-	)
-	x := 8.0
-	y := float64(world.ScreenHeight) - barH - 12
-
-	r.DrawScreenRect(x-2, y-2, barW+4, barH+4, ColorHPBack)
-
-	ratio := 0.0
-	if maxHP > 0 {
-		ratio = float64(hp) / float64(maxHP)
-	}
-	if ratio < 0 {
-		ratio = 0
-	}
-	if ratio > 1 {
-		ratio = 1
-	}
-
-	c := ColorHPFull
-	switch {
-	case ratio < 0.3:
-		c = ColorHPLow
-	case ratio < 0.6:
-		c = ColorHPMid
-	}
-
-	if ratio > 0 {
-		r.DrawScreenRect(x, y, barW*ratio, barH, c)
-	}
-	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+1, ColorMenuText)
 }
 
 // drawSpawnZone рисует пульсирующую сферу в центре зоны спавна.
@@ -1002,5 +1017,40 @@ func drawProtectorBeams(r SceneRenderer, w *world.World) {
 			tcx, tcy := t.Center()
 			r.DrawLine(ecx, ecy, tcx, tcy, thickness, ColorProtectorBeam)
 		}
+	}
+}
+
+func drawPlayerSpawns(r SceneRenderer, w *world.World) {
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() {
+			// Мёртвый — тусклое кольцо.
+			c := color.NRGBA{R: 80, G: 20, B: 20, A: 120}
+			r.DrawCircle(sp.X, sp.Y, sp.Size/2, c)
+			continue
+		}
+
+		// Основной круг — цвета игрока.
+		pulse := 0.9 + 0.1*math.Sin(float64(i)*1.7+0.5)
+		rad := sp.Size / 2 * pulse
+		c := color.NRGBA{R: 60, G: 200, B: 100, A: 200}
+		r.DrawCircle(sp.X, sp.Y, rad, c)
+		r.DrawCircle(sp.X, sp.Y, rad*0.6, color.NRGBA{R: 100, G: 240, B: 140, A: 220})
+
+		// HP-бар над спавном.
+		const barW = 60.0
+		const barH = 6.0
+		bx := sp.X - barW/2
+		by := sp.Y - sp.Size/2 - 14
+		r.DrawRect(bx-1, by-1, barW+2, barH+2, ColorEnemyHPBack)
+
+		ratio := sp.HPRatio()
+		barColor := ColorHPFull
+		if ratio < 0.3 {
+			barColor = ColorHPLow
+		} else if ratio < 0.6 {
+			barColor = ColorHPMid
+		}
+		r.DrawRect(bx, by, barW*ratio, barH, barColor)
 	}
 }

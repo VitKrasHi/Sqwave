@@ -1,6 +1,7 @@
 package world
 
 import (
+	"math"
 	"math/rand"
 	"time"
 
@@ -18,6 +19,7 @@ type World struct {
 	Harpoons         []Harpoon
 	Turrets          []Turret
 	Walls            []geometry.Rect
+	SpawnPoints      []SpawnPoint
 	SpawnZone        geometry.Rect
 	Rng              *rand.Rand
 	NavGrid          *geometry.Grid
@@ -272,4 +274,22 @@ func defaultWalls() []geometry.Rect {
 		{X: 2500, Y: 1100, W: 300, H: t},
 		{X: 2400, Y: 1250, W: t, H: 150},
 	}
+}
+
+// NearestSpawnDist — расстояние от игрока до ближайшего живого спавна.
+// -1 если живых спавнов нет.
+func (w *World) NearestSpawnDist() float64 {
+	pcx, pcy := w.Player.Center()
+	best := -1.0
+	for i := range w.SpawnPoints {
+		if w.SpawnPoints[i].IsDead() {
+			continue
+		}
+		scx, scy := w.SpawnPoints[i].Center()
+		d := math.Hypot(scx-pcx, scy-pcy)
+		if best < 0 || d < best {
+			best = d
+		}
+	}
+	return best
 }

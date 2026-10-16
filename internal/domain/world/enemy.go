@@ -177,9 +177,9 @@ var enemyStats = map[EnemyType]EnemyStats{
 		AttackCooldownMax: 150,
 		PreferredMin:      180,
 		PreferredMax:      340,
-		ProjectileSpeed:   8, // было 4 — почти вдвое быстрее
+		ProjectileSpeed:   12, // было 4 — почти вдвое быстрее
 		ProjectileSize:    8,
-		ProjectileLife:    90, // было 150 — короче, чтобы не летели через пол-карты
+		ProjectileLife:    150, // было 150 — короче, чтобы не летели через пол-карты
 	},
 	EnemyScout: {
 		Name:              "Scout",
@@ -590,19 +590,25 @@ type Enemy struct {
 	// Множители сложности (для timer wave). 0 = 1.0 (база).
 	HPMultiplier    float64
 	SpeedMultiplier float64
+	// Defend: индекс спавна-цели (-1 = цель игрок).
+	TargetSpawnIdx int
+	// Defend: изначальное намерение — атаковать спавн.
+	OriginalTargetSpawn int // -1 = на игрока, >= 0 = на спавн
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {
 	hp := t.Stats().MaxHP
 	return Enemy{
-		Type:          t,
-		X:             x,
-		Y:             y,
-		LastX:         x,
-		LastY:         y,
-		HP:            hp,
-		LastHP:        hp,
-		HealTargetIdx: -1, // ← добавить
+		Type:                t,
+		X:                   x,
+		Y:                   y,
+		LastX:               x,
+		LastY:               y,
+		HP:                  hp,
+		LastHP:              hp,
+		HealTargetIdx:       -1,
+		TargetSpawnIdx:      -1,
+		OriginalTargetSpawn: -1,
 	}
 }
 
