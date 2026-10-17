@@ -2,13 +2,20 @@ package world
 
 import "Sqwave/internal/domain/geometry"
 
-// SpawnPoint — точка, которую игрок защищает в Defend-волне.
+const (
+	SpawnFactionPlayer = 0
+	SpawnFactionEnemy  = 1
+)
+
 type SpawnPoint struct {
 	X, Y  float64
 	Size  float64
 	HP    int
 	MaxHP int
 	Index int
+
+	// Faction — кому принадлежит спавн: 0=игрок (Defend), 1=враг (Attack).
+	Faction int
 }
 
 func (s *SpawnPoint) Rect() geometry.Rect {

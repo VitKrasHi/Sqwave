@@ -84,6 +84,18 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 			e.TakeDamage(damage)
 		}
 	}
+
+	// Вражеские спавны.
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		scx, scy := sp.Center()
+		if math.Hypot(scx-x, scy-y) <= radius {
+			sp.Damage(damage)
+		}
+	}
 }
 
 func StepExplosions(w *world.World) {

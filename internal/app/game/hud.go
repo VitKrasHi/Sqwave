@@ -7,8 +7,6 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
-// drawWavePanel — панель справа сверху: волна, уровень, состав,
-// прогресс, статус игрока.
 func drawWavePanel(r SceneRenderer, w *world.World) {
 	ws := &w.Wave
 
@@ -89,17 +87,17 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 		headerLines++
 	}
 
-	// Прогресс: Spawned/Killed/Alive + (Spawns для defend) +
+	// Прогресс: Spawned/Killed/Alive + (Spawns для Defend/Attack) +
 	// (группа или таймер следующей группы).
 	progressLines := 3
-	if ws.Kind == world.WaveKindDefend {
+	if ws.Kind == world.WaveKindDefend || ws.Kind == world.WaveKindAttack {
 		progressLines++
 	}
 	if ws.GroupRemaining > 0 {
 		progressLines++
 	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
 		progressLines++
-	} else if ws.Kind == world.WaveKindTimer && ws.TimerGroupCooldown > 0 {
+	} else if (ws.Kind == world.WaveKindTimer || ws.Kind == world.WaveKindAttack) && ws.TimerGroupCooldown > 0 {
 		progressLines++
 	}
 
@@ -145,6 +143,9 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 		case world.WaveKindDefend:
 			kindStr = "DEFEND"
 			kindCol = color.NRGBA{R: 100, G: 220, B: 140, A: 255}
+		case world.WaveKindAttack:
+			kindStr = "ATTACK"
+			kindCol = color.NRGBA{R: 220, G: 100, B: 120, A: 255}
 		}
 
 		r.DrawScreenText(fmt.Sprintf("%s  Level %s", kindStr, roman[lvl]),
@@ -177,13 +178,16 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {
 		sec := ws.PauseTimer / 60
 
-		// Спец-сообщение для defend-волны.
-		switch ws.DefendOutcome {
-		case 1:
+		switch {
+		case ws.DefendOutcome == 1:
 			r.DrawScreenText("DEFEND SUCCESS", panelX+12, y, ColorMenuSelected)
 			y += rowH
-		case -1:
+		case ws.DefendOutcome == -1:
 			r.DrawScreenText("SPAWN LOST", panelX+12, y, ColorHPLow)
+			y += rowH
+		case ws.AttackOutcome == 1:
+			r.DrawScreenText("ATTACK SUCCESS", panelX+12, y,
+				color.NRGBA{R: 220, G: 100, B: 120, A: 255})
 			y += rowH
 		default:
 			r.DrawScreenText(fmt.Sprintf("Next wave in %ds", sec),
@@ -202,7 +206,7 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	y += 4
 
 	// Прогресс.
-	if ws.Kind == world.WaveKindTimer {
+	if ws.Kind == world.WaveKindTimer || ws.Kind == world.WaveKindAttack {
 		r.DrawScreenText(fmt.Sprintf("Spawned: %d", ws.SpawnedCount),
 			panelX+12, y, ColorMenuText)
 		y += slotH
@@ -226,7 +230,7 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 		panelX+12, y, ColorMenuText)
 	y += slotH
 
-	// Для Defend — сколько спавнов живо.
+	// Defend: спавны игрока. Attack: спавны врагов.
 	if ws.Kind == world.WaveKindDefend {
 		c := ColorMenuSelected
 		if ws.DefendSpawnsAlive <= 1 {
@@ -236,38 +240,28 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 			ws.DefendSpawnsAlive, ws.DefendSpawnCount),
 			panelX+12, y, c)
 		y += slotH
+	} else if ws.Kind == world.WaveKindAttack {
+		c := color.NRGBA{R: 220, G: 100, B: 120, A: 255}
+		r.DrawScreenText(fmt.Sprintf("Enemy spawns: %d / %d",
+			ws.AttackSpawnsAlive, ws.AttackSpawnCount),
+			panelX+12, y, c)
+		y += slotH
 	}
 
-	// Статус текущей группы.
+	// Статус текущей группы или кулдауна до следующей.
 	if ws.GroupRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Group: %d left", ws.GroupRemaining),
 			panelX+12, y, ColorMenuDim)
 	} else if ws.Kind == world.WaveKindCommon && ws.GroupsRemaining > 0 {
 		r.DrawScreenText(fmt.Sprintf("Groups left: %d", ws.GroupsRemaining),
 			panelX+12, y, ColorMenuDim)
-	} else if ws.Kind == world.WaveKindTimer && ws.TimerGroupCooldown > 0 {
+	} else if (ws.Kind == world.WaveKindTimer || ws.Kind == world.WaveKindAttack) && ws.TimerGroupCooldown > 0 {
 		sec := ws.TimerGroupCooldown / 60
 		r.DrawScreenText(fmt.Sprintf("Next group: %ds", sec),
 			panelX+12, y, ColorMenuDim)
 	}
-
-	// Индикатор установки турели инженером.
-	engineerSettingUp := false
-	for i := range w.Enemies {
-		e := &w.Enemies[i]
-		if e.Type == world.EnemyEngineer && e.TurretSetupTimer > 0 {
-			engineerSettingUp = true
-			break
-		}
-	}
-	if engineerSettingUp {
-		r.DrawScreenTextScaled("ENGINEER SETTING UP TURRET",
-			8, float64(world.ScreenHeight)-150, 1.6,
-			color.NRGBA{R: 255, G: 100, B: 100, A: 255})
-	}
 }
 
-// drawHPBar — полоса здоровья игрока внизу слева.
 func drawHPBar(r SceneRenderer, hp, maxHP int) {
 	const (
 		barW = 220.0
@@ -300,5 +294,5 @@ func drawHPBar(r SceneRenderer, hp, maxHP int) {
 	if ratio > 0 {
 		r.DrawScreenRect(x, y, barW*ratio, barH, c)
 	}
-	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+6, ColorMenuText)
+	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+1, ColorMenuText)
 }

@@ -24,19 +24,24 @@ func StepWaves(w *world.World) {
 		return
 	}
 
-	if ws.Kind == world.WaveKindTimer {
+	switch ws.Kind {
+	case world.WaveKindTimer:
 		stepTimerWave(w)
-		return
-	}
-	if ws.Kind == world.WaveKindDefend {
-		StepDefendObjectives(w) // проверяет win/lose, обновляет приоритеты
+	case world.WaveKindDefend:
+		StepDefendObjectives(w)
 		if !ws.Active {
 			return
 		}
 		stepDefendWave(w)
-		return
+	case world.WaveKindAttack:
+		StepAttackObjectives(w)
+		if !ws.Active {
+			return
+		}
+		stepAttackWave(w)
+	default:
+		stepCommonWave(w)
 	}
-	stepCommonWave(w)
 }
 
 // ==================== COMMON ====================
@@ -209,20 +214,23 @@ func startWave(w *world.World) {
 	ws.GroupRemaining = 0
 	ws.GroupSpawnTimer = 0
 	ws.WaveSupports = 0
+	ws.GroupSupports = 0
 	ws.WaveSnipers = 0
 	ws.MaxWaveSnipers = world.SniperLimitFor(w.Rng)
-	ws.GroupSupports = 0
 	ws.DefendOutcome = 0
 	ws.DefendPenalty = false
+	ws.AttackOutcome = 0
 
-	// 1/3 Common, 1/3 Timer, 1/3 Defend.
-	switch w.Rng.Intn(3) {
+	// 1/4 Common, 1/4 Timer, 1/4 Defend, 1/4 Attack.
+	switch w.Rng.Intn(4) {
 	case 0:
 		startCommonWave(w)
 	case 1:
 		startTimerWave(w)
-	default:
+	case 2:
 		startDefendWave(w)
+	default:
+		startAttackWave(w)
 	}
 }
 
@@ -630,4 +638,87 @@ func pickWaveEnemy(w *world.World, ws *world.WaveState) world.EnemyType {
 		return t
 	}
 	return world.EnemyInfantry
+}
+
+func startAttackWave(w *world.World) {
+	ws := &w.Wave
+	ws.Kind = world.WaveKindAttack
+	ws.WaveSize = 0
+	ws.GroupsTotal = 0
+	ws.GroupsRemaining = 0
+	ws.TimerTotal = 0
+	ws.TimerRemaining = 0
+	ws.TimerGroupCooldown = 0
+
+	count := world.AttackSpawnCountFor(ws.WaveLevel)
+	hp := world.AttackSpawnHPFor(ws.WaveLevel)
+	spawnEnemySpawnsForWave(w, count, hp)
+	ws.AttackSpawnCount = len(w.SpawnPoints)
+	ws.AttackSpawnsAlive = len(w.SpawnPoints)
+
+	if track := world.AttackTrackForLevel(ws.WaveLevel); track != "" {
+		w.PendingTrack = track
+	}
+
+	// Первая группа сразу.
+	spawnAttackGroup(w)
+}
+
+func stepAttackWave(w *world.World) {
+	ws := &w.Wave
+
+	// Спавн текущей группы.
+	if ws.GroupRemaining > 0 {
+		if ws.GroupSpawnTimer > 0 {
+			ws.GroupSpawnTimer--
+			return
+		}
+		spawnOneTimerGroupMember(w)
+		ws.GroupSpawnTimer = 3
+		return
+	}
+
+	// Кулдаун между группами.
+	if ws.TimerGroupCooldown > 0 {
+		ws.TimerGroupCooldown--
+		return
+	}
+
+	// Спавним следующую.
+	spawnAttackGroup(w)
+}
+
+// spawnAttackGroup — спавнит группу у случайного живого вражеского спавна.
+func spawnAttackGroup(w *world.World) {
+	ws := &w.Wave
+
+	// Найти живые вражеские спавны.
+	var alive []int
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.Faction == world.SpawnFactionEnemy && !sp.IsDead() {
+			alive = append(alive, i)
+		}
+	}
+	if len(alive) == 0 {
+		return // победа будет зафиксирована в StepAttackObjectives
+	}
+
+	// Группа спавнится у случайного живого спавна.
+	srcIdx := alive[w.Rng.Intn(len(alive))]
+	src := &w.SpawnPoints[srcIdx]
+
+	minSize, maxSize := world.AttackGroupSizeRangeFor(ws.WaveLevel)
+	size := minSize
+	if maxSize > minSize {
+		size += w.Rng.Intn(maxSize - minSize + 1)
+	}
+
+	ws.GroupID++
+	ws.GroupRemaining = size
+	ws.GroupSpawnTimer = 0
+	ws.GroupSupports = 0
+
+	ws.GroupOriginX = src.X + (w.Rng.Float64()*2-1)*60
+	ws.GroupOriginY = src.Y + (w.Rng.Float64()*2-1)*60
 }

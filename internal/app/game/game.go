@@ -234,7 +234,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		drawNavDebug(r, w)
 	}
 
-	drawPlayerSpawns(r, w)
+	drawSpawns(r, w)
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
@@ -1020,24 +1020,39 @@ func drawProtectorBeams(r SceneRenderer, w *world.World) {
 	}
 }
 
-func drawPlayerSpawns(r SceneRenderer, w *world.World) {
+func drawSpawns(r SceneRenderer, w *world.World) {
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
+
+		isPlayerFaction := sp.Faction == world.SpawnFactionPlayer
+
 		if sp.IsDead() {
-			// Мёртвый — тусклое кольцо.
-			c := color.NRGBA{R: 80, G: 20, B: 20, A: 120}
+			var c color.NRGBA
+			if isPlayerFaction {
+				c = color.NRGBA{R: 80, G: 20, B: 20, A: 120}
+			} else {
+				c = color.NRGBA{R: 60, G: 60, B: 60, A: 120}
+			}
 			r.DrawCircle(sp.X, sp.Y, sp.Size/2, c)
 			continue
 		}
 
-		// Основной круг — цвета игрока.
 		pulse := 0.9 + 0.1*math.Sin(float64(i)*1.7+0.5)
 		rad := sp.Size / 2 * pulse
-		c := color.NRGBA{R: 60, G: 200, B: 100, A: 200}
-		r.DrawCircle(sp.X, sp.Y, rad, c)
-		r.DrawCircle(sp.X, sp.Y, rad*0.6, color.NRGBA{R: 100, G: 240, B: 140, A: 220})
 
-		// HP-бар над спавном.
+		var c, cInner color.NRGBA
+		if isPlayerFaction {
+			c = color.NRGBA{R: 60, G: 200, B: 100, A: 200}
+			cInner = color.NRGBA{R: 100, G: 240, B: 140, A: 220}
+		} else {
+			c = color.NRGBA{R: 200, G: 60, B: 80, A: 200}
+			cInner = color.NRGBA{R: 255, G: 100, B: 120, A: 220}
+		}
+
+		r.DrawCircle(sp.X, sp.Y, rad, c)
+		r.DrawCircle(sp.X, sp.Y, rad*0.6, cInner)
+
+		// HP-бар.
 		const barW = 60.0
 		const barH = 6.0
 		bx := sp.X - barW/2

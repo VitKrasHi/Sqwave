@@ -205,6 +205,17 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 			e.TakeDamage(dmg)
 		}
 	}
+	// Вражеские спавны.
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, sp.Rect()); ok {
+			dmg := p.Weapon.DamageAt(0, 1)
+			sp.Damage(dmg)
+		}
+	}
 }
 
 // fireRay пускает один hitscan-луч под заданным углом и создаёт Bullet-отрезок.
@@ -233,6 +244,7 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	// Ближайший враг или турель до стены.
 	enemyT := wallT
 	var hitEnemy *world.Enemy
+	var hitSpawn *world.SpawnPoint
 
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
@@ -254,6 +266,20 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, t.Rect()); ok {
 			if tt < enemyT {
 				enemyT = tt
+				hitEnemy = nil
+			}
+		}
+	}
+	// Вражеские спавны.
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, sp.Rect()); ok {
+			if tt < enemyT {
+				enemyT = tt
+				hitSpawn = sp
 				hitEnemy = nil
 			}
 		}
@@ -293,6 +319,10 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 					p.HarpoonID = -1
 				}
 			}
+		} else if hitSpawn != nil {
+			distance := enemyT * weapon.Range
+			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			hitSpawn.Damage(dmg)
 		} else {
 			distance := enemyT * weapon.Range
 			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)

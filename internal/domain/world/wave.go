@@ -8,6 +8,7 @@ const (
 	WaveKindCommon WaveKind = iota
 	WaveKindTimer
 	WaveKindDefend
+	WaveKindAttack
 )
 
 // Ограничения на поддержку.
@@ -87,6 +88,11 @@ type WaveState struct {
 	DefendSpawnsAlive int  // сколько ещё живо
 	DefendOutcome     int  // 0=в процессе, 1=победа, -1=поражение
 	DefendPenalty     bool // штрафная группа уже спавнена
+
+	// Attack-волна.
+	AttackSpawnCount  int
+	AttackSpawnsAlive int
+	AttackOutcome     int // 0=в процессе, 1=победа (все спавны убиты)
 }
 
 func (ws *WaveState) IsVictory() bool {
@@ -344,4 +350,69 @@ func DefendTrackForLevel(level int) string {
 // Возвращает 3..5 случайно.
 func SniperLimitFor(rng intRng) int {
 	return 3 + rng.Intn(3) // 3, 4 или 5
+}
+
+// AttackSpawnCountFor — сколько спавнов у врагов.
+func AttackSpawnCountFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 1
+	case 3, 4:
+		return 2
+	case 5:
+		return 3
+	}
+	return 1
+}
+
+// AttackSpawnHPFor — HP одного вражеского спавна.
+func AttackSpawnHPFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 700
+	case 3, 4:
+		return 1000
+	case 5:
+		return 1400
+	}
+	return 700
+}
+
+// AttackTrackForLevel — трек для attack-волны.
+func AttackTrackForLevel(level int) string {
+	switch level {
+	case 1, 2:
+		return "assets/music/cy2v9.wav"
+	case 3, 4:
+		return "assets/music/suck.wav"
+	case 5:
+		return "assets/music/pull_the_trigger.wav"
+	}
+	return ""
+}
+
+// AttackGroupIntervalFor — интервал между группами в тиках.
+func AttackGroupIntervalFor(level int) int {
+	switch level {
+	case 1, 2:
+		return 30 * 60
+	case 3, 4:
+		return 25 * 60
+	case 5:
+		return 20 * 60
+	}
+	return 30 * 60
+}
+
+// AttackGroupSizeRangeFor — диапазон размера группы.
+func AttackGroupSizeRangeFor(level int) (int, int) {
+	switch level {
+	case 1:
+		return 20, 40
+	case 2, 3:
+		return 25, 50
+	case 4, 5:
+		return 30, 60
+	}
+	return 20, 40
 }

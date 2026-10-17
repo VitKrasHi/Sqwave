@@ -199,3 +199,89 @@ func pickRandomSpawnLocation(w *world.World) (float64, float64, bool) {
 	}
 	return 0, 0, false
 }
+
+// StepAttackObjectives — проверяет победу в Attack-волне.
+// Победа: все вражеские спавны уничтожены.
+func StepAttackObjectives(w *world.World) {
+	ws := &w.Wave
+	if ws.Kind != world.WaveKindAttack || !ws.Active {
+		return
+	}
+
+	alive := 0
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.Faction == world.SpawnFactionEnemy && !sp.IsDead() {
+			alive++
+		}
+	}
+	ws.AttackSpawnsAlive = alive
+
+	if alive == 0 {
+		ws.AttackOutcome = 1
+		ws.Active = false
+		ws.PauseTimer = wavePauseTicks
+
+		// Все враги волны погибают.
+		for i := range w.Enemies {
+			if w.Enemies[i].GroupID > 0 {
+				w.Enemies[i].HP = 0
+			}
+		}
+	}
+}
+
+// spawnEnemySpawnsForWave — размещает вражеские спавны в случайных местах.
+func spawnEnemySpawnsForWave(w *world.World, count int, hp int) {
+	w.SpawnPoints = w.SpawnPoints[:0]
+
+	pcx, pcy := w.Player.Center()
+
+	for i := 0; i < count; i++ {
+		x, y, ok := pickEnemySpawnLocation(w, pcx, pcy)
+		if !ok {
+			continue
+		}
+		w.SpawnPoints = append(w.SpawnPoints, world.SpawnPoint{
+			X:       x,
+			Y:       y,
+			Size:    70,
+			HP:      hp,
+			MaxHP:   hp,
+			Index:   i,
+			Faction: world.SpawnFactionEnemy,
+		})
+	}
+}
+
+func pickEnemySpawnLocation(w *world.World, pcx, pcy float64) (float64, float64, bool) {
+	const minDistFromPlayer = 600.0
+	const minDistBetween = 500.0
+	const margin = 300.0
+
+	for attempt := 0; attempt < 50; attempt++ {
+		x := margin + w.Rng.Float64()*(world.WorldWidth-2*margin)
+		y := margin + w.Rng.Float64()*(world.WorldHeight-2*margin)
+
+		if math.Hypot(x-pcx, y-pcy) < minDistFromPlayer {
+			continue
+		}
+		if pointInWall(w, x, y, 80) {
+			continue
+		}
+
+		ok := true
+		for i := range w.SpawnPoints {
+			scx, scy := w.SpawnPoints[i].Center()
+			if math.Hypot(x-scx, y-scy) < minDistBetween {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue
+		}
+		return x, y, true
+	}
+	return 0, 0, false
+}
