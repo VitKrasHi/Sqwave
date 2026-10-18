@@ -48,6 +48,7 @@ type WeaponStats struct {
 
 	HPBonus    int
 	SpeedBonus int
+	EPBonus    int
 
 	// Урон.
 	DamageKind DamageKind
@@ -71,27 +72,27 @@ var weapons = map[WeaponType]WeaponStats{
 	WeaponPistol: {
 		Name: "Pistol", FireCooldown: 18, Range: 700,
 		Spread: 2, Pellets: 1, VisualLife: 6,
-		HPBonus: 40, SpeedBonus: 50,
+		HPBonus: 40, SpeedBonus: 50, EPBonus: 20,
 		DamageKind: DamageFixed, Damage: 30,
 	},
 	WeaponSMG: {
 		Name: "SMG", FireCooldown: 4, Range: 550,
 		Spread: 6, Pellets: 1, VisualLife: 4,
-		HPBonus: 60, SpeedBonus: 30,
+		HPBonus: 60, SpeedBonus: 30, EPBonus: 30,
 		DamageKind: DamageDistanceFalloff,
 		DamageNear: 20, DamageFar: 5, FalloffAt: 550,
 	},
 	WeaponShotgun: {
 		Name: "Shotgun", FireCooldown: 45, Range: 260,
 		Spread: 25, Pellets: 8, VisualLife: 5,
-		HPBonus: 80, SpeedBonus: 20,
+		HPBonus: 80, SpeedBonus: 20, EPBonus: 40,
 		DamageKind: DamageDistanceFalloff,
 		DamageNear: 80, DamageFar: 5, FalloffAt: 260,
 	},
 	WeaponSniper: {
 		Name: "Sniper", FireCooldown: 60, Range: 3000,
 		Spread: 0, Pellets: 1, VisualLife: 12, ChargeTime: 45,
-		HPBonus: 20, SpeedBonus: 40,
+		HPBonus: 20, SpeedBonus: 40, EPBonus: 40,
 		DamageKind:      DamageChargeScaled,
 		DamageMinCharge: 50, DamageMaxCharge: 200,
 	},
@@ -105,21 +106,21 @@ var weapons = map[WeaponType]WeaponStats{
 		ProjectileSize:  8,
 		ExplosionRadius: 130,
 		ExplosionLife:   14,
-		HPBonus:         120, SpeedBonus: 20,
+		HPBonus:         120, SpeedBonus: 20, EPBonus: 60,
 		DamageKind:      DamageRocket,
 		DirectHitDamage: 120, ExplosionDamage: 40,
 	},
 	WeaponSword: {
 		Name: "Sword", FireCooldown: 24,
 		MeleeRange: 82, MeleeArc: 150, SwingDuration: 12, BladeWidth: 5,
-		HPBonus: 100, SpeedBonus: 50,
+		HPBonus: 100, SpeedBonus: 50, EPBonus: 40,
 		DamageKind: DamageFixed, Damage: 50,
 	},
 	WeaponShield: {
 		Name: "Shield", FireCooldown: 30,
 		MeleeRange: 58, MeleeArc: 0, SwingDuration: 10, BladeWidth: 18,
 		IsShield: true, IsThrust: true,
-		HPBonus: 50, SpeedBonus: 50,
+		HPBonus: 50, SpeedBonus: 50, EPBonus: 30,
 		DamageKind:     DamageNone,
 		KnockbackForce: 15,
 	},

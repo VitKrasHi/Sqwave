@@ -349,7 +349,7 @@ func DefendTrackForLevel(level int) string {
 // SniperLimitFor — сколько снайперов максимум за волну.
 // Возвращает 3..5 случайно.
 func SniperLimitFor(rng intRng) int {
-	return 3 + rng.Intn(3) // 3, 4 или 5
+	return 3 // 3, 4 или 5
 }
 
 // AttackSpawnCountFor — сколько спавнов у врагов.

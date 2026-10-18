@@ -13,16 +13,26 @@ type SwingState struct {
 }
 
 type Player struct {
-	X, Y              float64
-	DashTimer         int
-	DashCooldownTimer int
-	Weapon            WeaponType
-	Secondary         WeaponType
-	FireCooldownTimer int
-	AimCharge         int
-	Swing             SwingState
-	SwingID           int // увеличивается при каждом новом замахе
-	Damage            int
+	X, Y float64
+	// Рывок щита (ПКМ с зарядкой).
+	DashChargeTicks    int  // текущий заряд (0..DashChargeMaxTicks)
+	DashActive         bool // рывок идёт
+	DashActiveTimer    int  // оставшиеся тики рывка
+	DashActiveDur      int  // всего тиков
+	DashActiveDirX     float64
+	DashActiveDirY     float64
+	DashActiveSpeed    float64
+	DashActiveStrength float64 // 0..1 (сила рывка)
+	DashActiveStun     int     // тики оглушения врагов
+	DashCooldown       int     // тики до следующего рывка
+	DashInstanceID     int     // для отслеживания таранов
+	Weapon             WeaponType
+	Secondary          WeaponType
+	FireCooldownTimer  int
+	AimCharge          int
+	Swing              SwingState
+	SwingID            int // увеличивается при каждом новом замахе
+	Damage             int
 	// AimX, AimY — мировая точка прицела. Обновляется каждый тик.
 	AimX, AimY float64
 
@@ -50,6 +60,14 @@ type Player struct {
 	HarpoonID int // ID гарпуна, к которому притянут (-1 если нет)
 
 	IsFiring bool
+
+	// EP — выносливость.
+	EP           int
+	EPRegenAccum float64
+
+	// Парирование (Space).
+	ParryWindow   int
+	ParryCooldown int
 }
 
 func (p *Player) Rect() geometry.Rect {
@@ -60,9 +78,7 @@ func (p *Player) Center() (float64, float64) {
 	return p.X + PlayerSize/2, p.Y + PlayerSize/2
 }
 
-func (p *Player) Dashing() bool {
-	return p.DashTimer > 0
-}
+func (p *Player) Dashing() bool { return p.DashActive }
 
 // IsAiming — снайперка заряжается прямо сейчас.
 func (p *Player) IsAiming() bool {
@@ -104,6 +120,9 @@ func (p *Player) SwingProgress() float64 {
 }
 
 func (p *Player) TakeDamage(n int) {
+	if p.DashActive {
+		return // неуязвим во время рывка
+	}
 	if n <= 0 {
 		return
 	}
@@ -144,35 +163,40 @@ func (p *Player) HasWeapon() bool {
 	return p.Weapon != WeaponNone
 }
 
-// SwapWeapon меняет активный слот со второстепенным.
-// Не делает ничего, если второй слот пуст.
+func (p *Player) EquipPrimary(w WeaponType) {
+	p.Weapon = w
+	p.resetWeaponState()
+	p.FireCooldownTimer = 0
+	if p.Weapon != WeaponNone && p.Secondary != WeaponNone {
+		p.EP = p.EPMax()
+	}
+}
+
+func (p *Player) EquipSecondary(w WeaponType) {
+	p.Secondary = w
+	if p.Weapon != WeaponNone && p.Secondary != WeaponNone {
+		p.EP = p.EPMax()
+	}
+}
+
 func (p *Player) SwapWeapon() {
 	if p.Secondary == WeaponNone {
 		return
 	}
 	p.Weapon, p.Secondary = p.Secondary, p.Weapon
 	p.resetWeaponState()
-}
-
-// EquipPrimary ставит оружие в активный слот и сбрасывает
-// состояние, привязанное к предыдущему оружию.
-func (p *Player) EquipPrimary(w WeaponType) {
-	p.Weapon = w
-	p.resetWeaponState()
-	p.FireCooldownTimer = 0
-}
-
-// EquipSecondary кладёт оружие во второстепенный слот.
-// Активный слот не трогает.
-func (p *Player) EquipSecondary(w WeaponType) {
-	p.Secondary = w
+	if p.EP > p.EPMax() {
+		p.EP = p.EPMax()
+	}
 }
 
 func (p *Player) resetWeaponState() {
 	p.AimCharge = 0
 	p.Swing.Active = false
 	if !p.Weapon.IsShield() {
-		p.DashTimer = 0
+		p.DashActive = false
+		p.DashActiveTimer = 0
+		p.DashChargeTicks = 0
 	}
 }
 
@@ -220,4 +244,35 @@ func (p *Player) ApplyBurn(ticks int) {
 
 func (p *Player) IsBurning() bool {
 	return p.BurnTimer > 0
+}
+
+func (p *Player) EPMax() int {
+	return p.Weapon.Stats().EPBonus + p.Secondary.Stats().EPBonus
+}
+
+func (p *Player) HasEP(n int) bool {
+	return p.EP >= n
+}
+
+func (p *Player) SpendEP(n int) bool {
+	if p.EP < n {
+		return false
+	}
+	p.EP -= n
+	return true
+}
+
+func (p *Player) EPRatio() float64 {
+	m := p.EPMax()
+	if m <= 0 {
+		return 0
+	}
+	r := float64(p.EP) / float64(m)
+	if r < 0 {
+		r = 0
+	}
+	if r > 1 {
+		r = 1
+	}
+	return r
 }

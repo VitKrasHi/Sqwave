@@ -61,7 +61,7 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 		// но рывок НЕ прерывается.
 		if !e.DashHit && rammerHitsPlayer(e, &w.Player) {
 			dmg := int(float64(stats.DashDamage) * e.DamageMul())
-			w.Player.TakeDamage(dmg)
+			TryMeleeDamage(w, e, dmg)
 			e.DashHit = true
 		}
 
@@ -84,7 +84,7 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 
 			if d <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx2, pcy2) {
 				dmg := int(float64(stats.Damage) * e.DamageMul())
-				w.Player.TakeDamage(dmg)
+				TryMeleeDamage(w, e, dmg)
 			}
 
 			span := stats.AttackCooldownMax - stats.AttackCooldownMin

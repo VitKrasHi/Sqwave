@@ -83,7 +83,7 @@ func StepHarpoons(w *world.World) {
 		}
 
 		// Попадание в игрока — CCD по отрезку.
-		if !p.IsDead() && !p.Harpooned {
+		if !p.IsDead() && !p.Harpooned && !p.DashActive {
 			playerRect := p.Rect()
 			if _, ok := geometry.RaySegmentIntersectsRect(oldX, oldY, h.X, h.Y, playerRect); ok {
 				h.Attached = true

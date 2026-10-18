@@ -20,7 +20,7 @@ func stepInfantry(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float
 
 			if dist <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx, pcy) {
 				dmg := int(float64(stats.Damage) * e.DamageMul())
-				w.Player.TakeDamage(dmg)
+				TryMeleeDamage(w, e, dmg)
 			}
 
 			span := stats.AttackCooldownMax - stats.AttackCooldownMin

@@ -296,3 +296,26 @@ func drawHPBar(r SceneRenderer, hp, maxHP int) {
 	}
 	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+1, ColorMenuText)
 }
+
+func drawEPBar(r SceneRenderer, p *world.Player) {
+	const (
+		barW = 220.0
+		barH = 10.0
+	)
+	x := 8.0
+	y := float64(world.ScreenHeight) - 18.0 - barH - 32
+
+	r.DrawScreenRect(x-2, y-2, barW+4, barH+4, ColorEPBack)
+
+	ratio := p.EPRatio()
+	if ratio > 0 {
+		c := ColorEPFull
+		if ratio < 0.25 {
+			c = ColorEPLow
+		}
+		r.DrawScreenRect(x, y, barW*ratio, barH, c)
+	}
+	r.DrawScreenText(
+		fmt.Sprintf("EP %d / %d", p.EP, p.EPMax()),
+		x+6, y-4, ColorMenuText)
+}

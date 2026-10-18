@@ -259,6 +259,64 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 	r.DrawLine(pcx, pcy, pcx+dx*aimLineLength, pcy+dy*aimLineLength, 2, ColorAim)
 
+	// Индикатор зарядки рывка.
+	if p.Weapon.IsShield() && p.DashChargeTicks > 0 {
+		pcx, pcy := p.Center()
+		const barW = 50.0
+		const barH = 6.0
+		bx := pcx - barW/2
+		by := pcy - world.PlayerSize/2 - 16
+
+		ratio := float64(p.DashChargeTicks) / float64(world.DashChargeMaxTicks)
+		ready := p.DashChargeTicks >= world.DashChargeMinTicks
+
+		r.DrawRect(bx-1, by-1, barW+2, barH+2, ColorEnemyHPBack)
+		c := color.NRGBA{R: 100, G: 200, B: 255, A: 255}
+		if ready {
+			// Готов к рывку — цвет от голубого к ярко-красному.
+			intensity := (ratio - 0.2) / 0.8
+			if intensity < 0 {
+				intensity = 0
+			}
+			c = color.NRGBA{
+				R: uint8(100 + 155*intensity),
+				G: uint8(200 - 150*intensity),
+				B: uint8(255 - 200*intensity),
+				A: 255,
+			}
+		}
+		r.DrawRect(bx, by, barW*ratio, barH, c)
+	}
+
+	// Индикатор кулдауна.
+	if p.Weapon.IsShield() && p.DashCooldown > 0 && !p.DashActive {
+		pcx, pcy := p.Center()
+		maxCd := float64(world.DashCdBaseTicks + world.DashCdBonusTicks)
+		ratio := float64(p.DashCooldown) / maxCd
+		rad := world.PlayerSize*0.8 + ratio*6
+		ring := color.NRGBA{R: 120, G: 120, B: 140, A: uint8(80 + 80*ratio)}
+		r.DrawCircle(pcx, pcy, rad, ring)
+	}
+
+	if p.DashActive {
+		// След за рывком.
+		tailLen := 40.0
+		pcx, pcy := p.Center()
+		tx := pcx - p.DashActiveDirX*tailLen
+		ty := pcy - p.DashActiveDirY*tailLen
+		alpha := uint8(150 * float64(p.DashActiveTimer) / float64(p.DashActiveDur))
+		trail := color.NRGBA{R: 180, G: 220, B: 255, A: alpha}
+		r.DrawLine(pcx, pcy, tx, ty, 8, trail)
+	}
+
+	if p.ParryWindow > 0 {
+		pcx, pcy := p.Center()
+		ratio := float64(p.ParryWindow) / float64(world.ParryWindowTicks)
+		rad := 22.0 + 8.0*(1-ratio)
+		c := color.NRGBA{R: 255, G: 240, B: 120, A: uint8(120 + 100*ratio)}
+		r.DrawCircle(pcx, pcy, rad, c)
+	}
+
 	// Прицел снайперки — маска + перекрестие.
 	if p.IsAiming() {
 		drawScope(r)
@@ -301,6 +359,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 
 		drawHPBar(r, p.CurrentHP(), p.MaxHP())
+		drawEPBar(r, p)
 		drawWavePanel(r, w)
 
 		// Индикатор установки турели.
@@ -669,6 +728,19 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			cAim := ColorHarpoonAim
 			cAim.A = alpha
 			r.DrawLine(cx, cy, e.HarpoonAimTargetX, e.HarpoonAimTargetY, 1.5, cAim)
+		}
+
+		if e.StunTimer > 0 {
+			cx, cy := e.Center()
+			const radius = 4.0
+			spin := float64(e.StunTimer) * 0.15
+			for k := 0; k < 3; k++ {
+				angle := spin + float64(k)*2*math.Pi/3
+				sx := cx + math.Cos(angle)*10
+				sy := cy - stats.Size/2 - 8 + math.Sin(angle)*3
+				r.DrawCircle(sx, sy, radius,
+					color.NRGBA{R: 255, G: 220, B: 80, A: 255})
+			}
 		}
 
 		// Взгляд — короткий штрих из центра.

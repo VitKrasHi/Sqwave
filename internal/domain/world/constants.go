@@ -21,8 +21,32 @@ const (
 	DashDuration = 8
 	DashCooldown = 40
 
+	// Рывок щита.
+	DashChargeMinTicks = 60  // 1 сек — минимальный порог активации
+	DashChargeMaxTicks = 300 // 5 сек — полная зарядка
+
+	DashSpeedBase      = 20.0 // скорость рывка при минимальной зарядке
+	DashSpeedBonus     = 10.0 // +8 при полной → 16 max
+	DashDurBase        = 25   // тиков рывка минимум
+	DashDurBonus       = 50   // +15 при полной → 40 max
+	DashStunBaseTicks  = 30   // 0.5 сек минимум оглушения
+	DashStunBonusTicks = 270  // +4.5 сек → 300 max (5 сек)
+	DashCdBaseTicks    = 30   // 0.5 сек минимум кулдауна
+	DashCdBonusTicks   = 270  // +4.5 сек → 300 max (5 сек)
+
 	EnemyBaseSpeed  = 1.0
 	EnemySpeedPerSP = 0.03
+
+	// EP — выносливость.
+	EPRegenPerSec = 5.0
+
+	// Парирование (Space).
+	ParryCost           = 20
+	ParryWindowTicks    = 15
+	ParryCooldown       = 60
+	ParryStunTicks      = 30
+	ParryKnockback      = 8.0
+	ParryKnockbackTicks = 8
 
 	NavCellSize     = 24.0
 	AgentClearance  = 4.0 // запас вокруг тела при сглаживании пути

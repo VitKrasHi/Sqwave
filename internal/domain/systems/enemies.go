@@ -54,6 +54,16 @@ func StepEnemies(w *world.World) {
 			continue
 		}
 
+		// Оглушение — пропускаем AI.
+		if e.StunTimer > 0 {
+			e.StunTimer--
+			if e.Type != world.EnemyGhost {
+				depenetrate(w, e)
+			}
+			e.LastX, e.LastY = e.X, e.Y
+			continue
+		}
+
 		if e.Type != world.EnemyGhost {
 			depenetrate(w, e)
 		}

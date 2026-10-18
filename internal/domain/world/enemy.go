@@ -455,6 +455,11 @@ type Enemy struct {
 	SwingActive bool
 	SwingTimer  int
 
+	// Оглушение (от тарана игрока).
+	StunTimer     int
+	LastDashHitID int  // DashInstanceID, от которого уже получил оглушение
+	Unparryable   bool // удар нельзя парировать (только блок урона)
+
 	KnockbackVX    float64
 	KnockbackVY    float64
 	KnockbackTimer int

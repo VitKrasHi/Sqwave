@@ -10,7 +10,7 @@ import (
 func StepPlayer(w *world.World, in input.PlayerInput) {
 	p := &w.Player
 
-	// Прицел — можно целиться всегда.
+	// --- Прицел ---
 	if p.HasPrevAim {
 		dx := in.AimX - p.PrevAimX
 		dy := in.AimY - p.PrevAimY
@@ -25,7 +25,27 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	p.AimY = in.AimY
 	p.IsFiring = in.Fire
 
-	// Пересборка валидности HeldBy.
+	// --- EP регенерация (всегда) ---
+	p.EPRegenAccum += world.EPRegenPerSec / 60.0
+	if p.EPRegenAccum >= 1 {
+		add := int(p.EPRegenAccum)
+		p.EPRegenAccum -= float64(add)
+		p.EP += add
+	}
+	if p.EP > p.EPMax() {
+		p.EP = p.EPMax()
+		p.EPRegenAccum = 0
+	}
+
+	// --- Таймеры ---
+	if p.ParryWindow > 0 {
+		p.ParryWindow--
+	}
+	if p.ParryCooldown > 0 {
+		p.ParryCooldown--
+	}
+
+	// --- Захват/гарпун ---
 	if p.Held {
 		valid := false
 		if p.HeldBy >= 0 && p.HeldBy < len(w.Enemies) {
@@ -39,10 +59,7 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 			p.HeldBy = -1
 		}
 	}
-
-	// Проверка гарпуна.
 	if p.Harpooned && p.HarpoonID != -1 {
-		// Валидность — гарпун ещё существует?
 		valid := false
 		for i := range w.Harpoons {
 			if w.Harpoons[i].ID == p.HarpoonID && !w.Harpoons[i].IsDead() {
@@ -56,9 +73,21 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		}
 	}
 
-	// Обездвижен гарпуном или захватом — блокируем движение.
-	if p.Held || p.Harpooned {
-		p.DashTimer = 0
+	// --- Обездвиживание ---
+	if p.DashActive {
+		p.Held = false
+		p.HeldBy = -1
+		p.Harpooned = false
+		p.HarpoonID = -1
+		for i := range w.Enemies {
+			if w.Enemies[i].Latched {
+				w.Enemies[i].Latched = false
+			}
+		}
+	} else if p.Held || p.Harpooned {
+		p.DashActive = false
+		p.DashActiveTimer = 0
+		p.DashChargeTicks = 0
 		p.VelX = 0
 		p.VelY = 0
 		p.PrevX = p.X
@@ -66,13 +95,38 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		return
 	}
 
-	if p.DashCooldownTimer > 0 {
-		p.DashCooldownTimer--
-	}
-	if p.DashTimer > 0 {
-		p.DashTimer--
+	// --- Кулдаун щит-рывка ---
+	if p.DashCooldown > 0 {
+		p.DashCooldown--
 	}
 
+	// --- Активный щит-рывок ---
+	if p.DashActive {
+		blocked := moveX(w, p.DashActiveDirX*p.DashActiveSpeed)
+		if moveY(w, p.DashActiveDirY*p.DashActiveSpeed) {
+			blocked = true
+		}
+		taranCollisions(w, p)
+
+		if blocked || p.DashActiveTimer <= 0 {
+			p.DashActive = false
+			p.DashActiveTimer = 0
+			p.DashCooldown = world.DashCdBaseTicks +
+				int(p.DashActiveStrength*float64(world.DashCdBonusTicks))
+			return
+		}
+		p.DashActiveTimer--
+		return
+	}
+
+	// --- Парирование (Space) ---
+	if in.Parry && p.ParryCooldown == 0 && p.HasEP(world.ParryCost) {
+		p.SpendEP(world.ParryCost)
+		p.ParryWindow = world.ParryWindowTicks
+		p.ParryCooldown = world.ParryCooldown
+	}
+
+	// --- Обычное движение ---
 	var dx, dy float64
 	if in.Up {
 		dy--
@@ -86,44 +140,98 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	if in.Right {
 		dx++
 	}
-
 	if l := math.Hypot(dx, dy); l > 0 {
 		dx /= l
 		dy /= l
 	}
 
-	// Рывок — только с щитом в руках.
-	if in.Dash && p.DashCooldownTimer == 0 && p.Weapon.IsShield() && (dx != 0 || dy != 0) {
-		p.DashTimer = world.DashDuration
-		p.DashCooldownTimer = world.DashCooldown
+	// Зарядка щит-рывка (ПКМ).
+	if p.Weapon.IsShield() && p.DashCooldown == 0 {
+		if in.DashChargeHeld {
+			p.DashChargeTicks++
+			if p.DashChargeTicks > world.DashChargeMaxTicks {
+				p.DashChargeTicks = world.DashChargeMaxTicks
+			}
+		} else if p.DashChargeTicks >= world.DashChargeMinTicks {
+			launchDash(w, p)
+			return
+		} else {
+			p.DashChargeTicks = 0
+		}
+	} else {
+		p.DashChargeTicks = 0
 	}
 
+	// Скорость.
 	speed := p.MoveSpeed()
-	if p.Dashing() {
-		speed = p.DashSpeed()
-	} else if p.IsAiming() {
+	if p.IsAiming() {
 		speed = p.AimSpeed()
 	}
 
-	blocked := moveX(w, dx*speed)
-	if moveY(w, dy*speed) {
-		blocked = true
-	}
+	moveX(w, dx*speed)
+	moveY(w, dy*speed)
 
-	// Врезались в стену во время рывка — рывок прекращается.
-	if p.Dashing() && blocked {
-		p.DashTimer = 0
-	}
-
-	// Обновляем скорость — нужна снайперу для предсказания.
 	p.VelX = p.X - p.PrevX
 	p.VelY = p.Y - p.PrevY
 	p.PrevX = p.X
 	p.PrevY = p.Y
 }
 
-// moveX двигает игрока по X и возвращает true, если движение
-// было ограничено стеной или границей мира.
+func launchDash(w *world.World, p *world.Player) {
+	pcx, pcy := p.Center()
+	aimX := p.AimX - pcx
+	aimY := p.AimY - pcy
+	l := math.Hypot(aimX, aimY)
+	if l < 0.01 {
+		aimX, aimY, l = 1, 0, 1
+	}
+	dx := aimX / l
+	dy := aimY / l
+
+	ratio := float64(p.DashChargeTicks-world.DashChargeMinTicks) /
+		float64(world.DashChargeMaxTicks-world.DashChargeMinTicks)
+	if ratio < 0 {
+		ratio = 0
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+
+	p.DashActive = true
+	p.DashActiveDur = world.DashDurBase + int(ratio*float64(world.DashDurBonus))
+	p.DashActiveTimer = p.DashActiveDur
+	p.DashActiveDirX = dx
+	p.DashActiveDirY = dy
+	p.DashActiveSpeed = world.DashSpeedBase + ratio*world.DashSpeedBonus
+	p.DashActiveStrength = ratio
+	p.DashActiveStun = world.DashStunBaseTicks +
+		int(ratio*float64(world.DashStunBonusTicks))
+	p.DashInstanceID++
+	p.DashChargeTicks = 0
+}
+
+func taranCollisions(w *world.World, p *world.Player) {
+	pRect := p.Rect()
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() {
+			continue
+		}
+		if e.Type == world.EnemyTank || e.Type == world.EnemyMachineGunner {
+			continue
+		}
+		if e.LastDashHitID == p.DashInstanceID {
+			continue
+		}
+		if pRect.Intersects(e.Rect()) {
+			e.LastDashHitID = p.DashInstanceID
+			e.StunTimer = p.DashActiveStun
+		}
+	}
+}
+
+// ==================== Движение с коллизиями ====================
+
 func moveX(w *world.World, dx float64) bool {
 	if dx == 0 {
 		return false
@@ -163,12 +271,10 @@ func moveX(w *world.World, dx float64) bool {
 		targetX = world.WorldWidth - world.PlayerSize
 		blocked = true
 	}
-
 	p.X = targetX
 	return blocked
 }
 
-// moveY — аналог для вертикали.
 func moveY(w *world.World, dy float64) bool {
 	if dy == 0 {
 		return false
@@ -208,7 +314,6 @@ func moveY(w *world.World, dy float64) bool {
 		targetY = world.WorldHeight - world.PlayerSize
 		blocked = true
 	}
-
 	p.Y = targetY
 	return blocked
 }

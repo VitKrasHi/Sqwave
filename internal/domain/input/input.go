@@ -2,6 +2,7 @@ package input
 
 type PlayerInput struct {
 	Up, Down, Left, Right bool
+	Parry                 bool // Space — только что нажат
 	Dash                  bool
 	Fire                  bool
 	FireReleased          bool
@@ -11,4 +12,5 @@ type PlayerInput struct {
 	MenuDown              bool // стрелка вниз / S
 	MenuConfirm           bool // Enter / Space
 	AimX, AimY            float64
+	DashChargeHeld        bool
 }

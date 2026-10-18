@@ -286,7 +286,7 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 	s.drawButton(r, rowBack, "Back")
 
 	r.DrawScreenText("UP/DOWN select   LEFT/RIGHT change   Enter confirm   Esc back",
-		px+40, py+panelH-30, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
+		px+40, py+panelH-36, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
 }
 
 func (s *Scene) drawNumericRow(r game.SceneRenderer, idx row, label, value string) {
@@ -306,8 +306,8 @@ func (s *Scene) drawNumericRow(r game.SceneRenderer, idx row, label, value strin
 		valueCol = color.NRGBA{R: 180, G: 190, B: 210, A: 255}
 	}
 
-	r.DrawScreenText(label, x+10, y+12, textCol)
-	r.DrawScreenText(value, x+330, y+12, valueCol)
+	r.DrawScreenText(label, x+10, y, textCol)
+	r.DrawScreenText(value, x+330, y, valueCol)
 }
 
 func (s *Scene) drawButton(r game.SceneRenderer, idx row, label string) {
@@ -327,5 +327,5 @@ func (s *Scene) drawButton(r game.SceneRenderer, idx row, label string) {
 
 	r.DrawScreenRect(x-2, y-2, w+4, h+4, border)
 	r.DrawScreenRect(x, y, w, h, bg)
-	r.DrawScreenTextScaled(label, x+20, y+12, 1.8, text)
+	r.DrawScreenTextScaled(label, x+20, y, 1.8, text)
 }

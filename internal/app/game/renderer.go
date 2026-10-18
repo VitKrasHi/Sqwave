@@ -41,6 +41,10 @@ var (
 	ColorHPLow  = color.NRGBA{R: 220, G: 60, B: 60, A: 255}
 	ColorHPBack = color.NRGBA{R: 25, G: 25, B: 30, A: 230}
 
+	ColorEPFull = color.NRGBA{R: 80, G: 180, B: 240, A: 255}
+	ColorEPBack = color.NRGBA{R: 20, G: 30, B: 45, A: 230}
+	ColorEPLow  = color.NRGBA{R: 130, G: 90, B: 200, A: 255}
+
 	ColorSpawnZone = color.NRGBA{R: 90, G: 220, B: 150, A: 255}
 
 	// Меню

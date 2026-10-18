@@ -16,7 +16,8 @@ func stepGhost(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	}
 
 	if dist <= stats.GhostContactRange && e.AttackTimer == 0 && !p.IsDead() {
-		p.TakeDamage(int(float64(stats.GhostContactDamage) * e.DamageMul()))
+		dmg := int(float64(stats.GhostContactDamage) * e.DamageMul())
+		TryMeleeDamage(w, e, dmg)
 		e.AttackTimer = stats.GhostContactCool
 	}
 

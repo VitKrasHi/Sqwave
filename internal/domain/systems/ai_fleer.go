@@ -18,6 +18,13 @@ func stepFleer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 			p.HeldBy = -1
 			return
 		}
+		if TryMeleeDamage(w, e, stats.FleerLatchDmg) {
+			// Парировано — отпускаем.
+			e.Latched = false
+			p.Held = false
+			p.HeldBy = -1
+			return
+		}
 
 		// Урон.
 		p.TakeDamage(stats.FleerLatchDmg)
@@ -52,8 +59,12 @@ func stepFleer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 	}
 	e.AimAngle += diff
 
-	// --- Проверка захвата ---
-	if dist < stats.FleerGrabRange {
+	// Во время рывка игрок неуязвим — захват невозможен.
+	if p.DashActive {
+		// Не цепляемся, но продолжаем движение к игроку (или мимо).
+		// Ничего дополнительно делать не нужно — обычная логика
+		// движения ниже.
+	} else if dist < stats.FleerGrabRange {
 		toPlayerAngle := math.Atan2(pcy-ecy, pcx-ecx)
 		angleFromAim := math.Abs(angleDiff(toPlayerAngle, e.AimAngle))
 		halfCone := stats.FleerConeWidth * math.Pi / 360

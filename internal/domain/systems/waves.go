@@ -635,6 +635,10 @@ func pickWaveEnemy(w *world.World, ws *world.WaveState) world.EnemyType {
 		if t == world.EnemySniper && !allowSniper {
 			continue
 		}
+		// ВРЕМЕННО
+		if t == world.EnemySniper {
+			println("PICK SNIPER", ws.WaveSnipers, "/", ws.MaxWaveSnipers, "wave", ws.Number)
+		}
 		return t
 	}
 	return world.EnemyInfantry
