@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 
+	"Sqwave/internal/app/settings"
 	"Sqwave/internal/domain/geometry"
 	"Sqwave/internal/domain/input"
 	"Sqwave/internal/domain/systems"
@@ -25,6 +26,12 @@ type Game struct {
 	onPlayerDied func()
 	deathFired   bool
 
+	paused         bool
+	pauseSelection int
+	onExitToMenu   func()
+
+	settings *settings.Panel
+
 	lastInput input.PlayerInput
 	ticks     int
 
@@ -39,15 +46,17 @@ func (g *Game) SetOnPlayerDied(f func()) {
 }
 
 func New(w *world.World, in InputSource, music *audio.Player) *Game {
+	// Останавливаем музыку меню при старте игры.
 	if music != nil {
 		music.Stop()
 	}
 
 	g := &Game{
-		world:  w,
-		input:  in,
-		camera: NewCamera(),
-		music:  music,
+		world:    w,
+		input:    in,
+		camera:   NewCamera(),
+		settings: settings.New(music),
+		music:    music,
 	}
 	cx, cy := w.Player.Center()
 	g.camera.Follow(cx, cy, cx, cy, 0)
@@ -58,6 +67,11 @@ func New(w *world.World, in InputSource, music *audio.Player) *Game {
 	return g
 }
 
+// SetOnExitToMenu задаёт колбэк для выхода из игры в главное меню.
+func (g *Game) SetOnExitToMenu(f func()) {
+	g.onExitToMenu = f
+}
+
 func (g *Game) Update() error {
 	g.ticks++
 
@@ -66,6 +80,47 @@ func (g *Game) Update() error {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
 		g.hudVisible = !g.hudVisible
+	}
+
+	// Settings panel — наивысший приоритет.
+	if g.settings.Open {
+		if g.settings.Update() {
+			g.settings.Open = false
+		}
+		return nil
+	}
+
+	// ESC — пауза (только если loadout меню закрыто).
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) && !g.menu.Open {
+		g.paused = !g.paused
+		if g.paused {
+			g.pauseSelection = 1 // по умолчанию "Continue"
+		}
+		return nil
+	}
+
+	// Пауза — обрабатываем паузное меню.
+	if g.paused {
+		if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) || inpututil.IsKeyJustPressed(ebiten.KeyW) {
+			g.pauseSelection = (g.pauseSelection - 1 + 3) % 3
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) || inpututil.IsKeyJustPressed(ebiten.KeyS) {
+			g.pauseSelection = (g.pauseSelection + 1) % 3
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+			switch g.pauseSelection {
+			case 0: // Settings
+				g.settings.Open = true
+				g.settings.Selected = settings.SelVolume
+			case 1: // Continue
+				g.paused = false
+			case 2: // Exit to menu
+				if g.onExitToMenu != nil {
+					g.onExitToMenu()
+				}
+			}
+		}
+		return nil
 	}
 
 	in := g.input.Poll()
@@ -309,14 +364,6 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawLine(pcx, pcy, tx, ty, 8, trail)
 	}
 
-	if p.ParryWindow > 0 {
-		pcx, pcy := p.Center()
-		ratio := float64(p.ParryWindow) / float64(world.ParryWindowTicks)
-		rad := 22.0 + 8.0*(1-ratio)
-		c := color.NRGBA{R: 255, G: 240, B: 120, A: uint8(120 + 100*ratio)}
-		r.DrawCircle(pcx, pcy, rad, c)
-	}
-
 	// Прицел снайперки — маска + перекрестие.
 	if p.IsAiming() {
 		drawScope(r)
@@ -359,7 +406,6 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 
 		drawHPBar(r, p.CurrentHP(), p.MaxHP())
-		drawEPBar(r, p)
 		drawWavePanel(r, w)
 
 		// Индикатор установки турели.
@@ -398,6 +444,14 @@ func (g *Game) Draw(r SceneRenderer) {
 		c.A = alpha
 		r.DrawScreenRect(0, 0, float64(world.ScreenWidth), float64(world.ScreenHeight), c)
 	}
+
+	// Паузное меню — поверх всего.
+	if g.paused {
+		drawPauseMenu(r, g.pauseSelection)
+	}
+
+	// Settings — поверх паузы.
+	g.settings.Draw(r)
 }
 
 // drawScope затемняет всё, кроме прямоугольного «окна», и рисует перекрестие.
@@ -778,25 +832,55 @@ func drawEnemyHPBar(r SceneRenderer, e *world.Enemy) {
 	r.DrawRect(x, y, barW*ratio, barH, c)
 }
 
-// drawEnemySwing — меч врага проворачивается вперёд в сторону игрока.
-// Угол идёт от −45° до +45° относительно направления взгляда.
 func drawEnemySwing(r SceneRenderer, e *world.Enemy) {
-	if !e.SwingActive {
+	if !e.SwingActive && !e.LungeActive {
 		return
 	}
 	stats := e.Type.Stats()
-	if stats.SwingDuration <= 0 {
-		return
-	}
-
-	progress := float64(e.SwingTimer) / float64(stats.SwingDuration)
-	baseAngle := math.Atan2(e.FacingY, e.FacingX)
-	angle := baseAngle - 0.8 + 1.6*progress // -0.8 → +0.8 рад
-
 	cx, cy := e.Center()
-	endX := cx + math.Cos(angle)*stats.MeleeRange
-	endY := cy + math.Sin(angle)*stats.MeleeRange
-	r.DrawLine(cx, cy, endX, endY, 4, ColorEnemySword)
+
+	if e.SwingActive && stats.SwingDuration > 0 {
+		progress := float64(e.SwingTimer) / float64(stats.SwingDuration)
+		baseAngle := math.Atan2(e.FacingY, e.FacingX)
+
+		// Замах: меч медленно поднимается над головой (вверх-назад),
+		// достигает верхней точки к 60% замаха, потом держится.
+		var angle float64
+		var length float64
+
+		if progress < 0.6 {
+			// 0..0.6 — поднимаем меч.
+			t := progress / 0.6
+			angle = baseAngle - t*1.4 // -1.4 рад = ~80° вверх-назад
+			length = stats.MeleeRange * (0.5 + 0.5*t)
+		} else {
+			// 0.6..1.0 — меч над головой, готовится.
+			angle = baseAngle - 1.4
+			length = stats.MeleeRange
+		}
+
+		endX := cx + math.Cos(angle)*length
+		endY := cy + math.Sin(angle)*length
+
+		// Замах — тусклый, но с растущей яркостью.
+		c := ColorEnemySwing
+		c.A = uint8(150 + 100*progress)
+		r.DrawLine(cx, cy, endX, endY, 5, c)
+
+		// Индикатор над головой — «готов бьёт».
+		if progress > 0.6 {
+			warnPulse := 0.7 + 0.3*math.Sin(float64(e.SwingTimer)*0.8)
+			rad := 5.0 + 3.0*warnPulse
+			cWarn := color.NRGBA{R: 255, G: 80, B: 80, A: 220}
+			r.DrawCircle(endX, endY, rad, cWarn)
+		}
+	} else if e.LungeActive {
+		// Рывок — меч резко вперёд.
+		angle := math.Atan2(e.LungeDirY, e.LungeDirX)
+		endX := cx + math.Cos(angle)*stats.MeleeRange
+		endY := cy + math.Sin(angle)*stats.MeleeRange
+		r.DrawLine(cx, cy, endX, endY, 6, ColorEnemySword)
+	}
 }
 
 func drawNavDebug(r SceneRenderer, w *world.World) {
@@ -1139,5 +1223,54 @@ func drawSpawns(r SceneRenderer, w *world.World) {
 			barColor = ColorHPMid
 		}
 		r.DrawRect(bx, by, barW*ratio, barH, barColor)
+	}
+}
+
+func drawPauseMenu(r SceneRenderer, selected int) {
+	sw := float64(world.ScreenWidth)
+	sh := float64(world.ScreenHeight)
+
+	r.DrawScreenRect(0, 0, sw, sh, color.NRGBA{R: 0, G: 0, B: 0, A: 160})
+
+	panelW := 400.0
+	panelH := 340.0
+	px := (sw - panelW) / 2
+	py := (sh - panelH) / 2
+
+	border := color.NRGBA{R: 90, G: 140, B: 200, A: 200}
+	bg := color.NRGBA{R: 16, G: 20, B: 30, A: 245}
+	r.DrawScreenRect(px-2, py-2, panelW+4, panelH+4, border)
+	r.DrawScreenRect(px, py, panelW, panelH, bg)
+
+	r.DrawScreenTextScaled("PAUSED", px+40, py+24, 2.4,
+		color.NRGBA{R: 120, G: 230, B: 255, A: 255})
+
+	r.DrawScreenRect(px+40, py+86, panelW-80, 2,
+		color.NRGBA{R: 60, G: 80, B: 110, A: 200})
+
+	buttons := []string{"Settings", "Continue", "Exit to main menu"}
+	btnW := panelW - 100
+	btnX := px + 50
+	btnH := 50.0
+	gap := 16.0
+	btnY := py + 120
+
+	for i, label := range buttons {
+		y := btnY + float64(i)*(btnH+gap)
+		isSel := i == selected
+
+		var bgBtn, borderBtn, textBtn color.NRGBA
+		if isSel {
+			bgBtn = color.NRGBA{R: 40, G: 70, B: 110, A: 255}
+			borderBtn = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
+			textBtn = color.NRGBA{R: 240, G: 250, B: 255, A: 255}
+		} else {
+			bgBtn = color.NRGBA{R: 26, G: 32, B: 44, A: 255}
+			borderBtn = color.NRGBA{R: 60, G: 80, B: 110, A: 255}
+			textBtn = color.NRGBA{R: 180, G: 190, B: 210, A: 255}
+		}
+		r.DrawScreenRect(btnX-2, y-2, btnW+4, btnH+4, borderBtn)
+		r.DrawScreenRect(btnX, y, btnW, btnH, bgBtn)
+		r.DrawScreenTextScaled(label, btnX+20, y+10, 1.8, textBtn)
 	}
 }

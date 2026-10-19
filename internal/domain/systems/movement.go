@@ -25,18 +25,6 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	p.AimY = in.AimY
 	p.IsFiring = in.Fire
 
-	// --- EP регенерация (всегда) ---
-	p.EPRegenAccum += world.EPRegenPerSec / 60.0
-	if p.EPRegenAccum >= 1 {
-		add := int(p.EPRegenAccum)
-		p.EPRegenAccum -= float64(add)
-		p.EP += add
-	}
-	if p.EP > p.EPMax() {
-		p.EP = p.EPMax()
-		p.EPRegenAccum = 0
-	}
-
 	// --- Таймеры ---
 	if p.ParryWindow > 0 {
 		p.ParryWindow--
@@ -117,13 +105,6 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		}
 		p.DashActiveTimer--
 		return
-	}
-
-	// --- Парирование (Space) ---
-	if in.Parry && p.ParryCooldown == 0 && p.HasEP(world.ParryCost) {
-		p.SpendEP(world.ParryCost)
-		p.ParryWindow = world.ParryWindowTicks
-		p.ParryCooldown = world.ParryCooldown
 	}
 
 	// --- Обычное движение ---

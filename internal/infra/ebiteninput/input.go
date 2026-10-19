@@ -18,7 +18,6 @@ func (s *Source) Poll() input.PlayerInput {
 		Down:           ebiten.IsKeyPressed(ebiten.KeyS),
 		Left:           ebiten.IsKeyPressed(ebiten.KeyA),
 		Right:          ebiten.IsKeyPressed(ebiten.KeyD),
-		Parry:          inpututil.IsKeyJustPressed(ebiten.KeySpace),
 		DashChargeHeld: ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight),
 		Fire:           ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),
 		FireReleased:   inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft),

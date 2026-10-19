@@ -37,17 +37,6 @@ const (
 	EnemyBaseSpeed  = 1.0
 	EnemySpeedPerSP = 0.03
 
-	// EP — выносливость.
-	EPRegenPerSec = 5.0
-
-	// Парирование (Space).
-	ParryCost           = 20
-	ParryWindowTicks    = 15
-	ParryCooldown       = 60
-	ParryStunTicks      = 30
-	ParryKnockback      = 8.0
-	ParryKnockbackTicks = 8
-
 	NavCellSize     = 24.0
 	AgentClearance  = 4.0 // запас вокруг тела при сглаживании пути
 	AgentPredictPad = 2.0 // запас при решении «идти напрямую»

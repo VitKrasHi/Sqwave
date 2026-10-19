@@ -167,16 +167,10 @@ func (p *Player) EquipPrimary(w WeaponType) {
 	p.Weapon = w
 	p.resetWeaponState()
 	p.FireCooldownTimer = 0
-	if p.Weapon != WeaponNone && p.Secondary != WeaponNone {
-		p.EP = p.EPMax()
-	}
 }
 
 func (p *Player) EquipSecondary(w WeaponType) {
 	p.Secondary = w
-	if p.Weapon != WeaponNone && p.Secondary != WeaponNone {
-		p.EP = p.EPMax()
-	}
 }
 
 func (p *Player) SwapWeapon() {
@@ -185,9 +179,6 @@ func (p *Player) SwapWeapon() {
 	}
 	p.Weapon, p.Secondary = p.Secondary, p.Weapon
 	p.resetWeaponState()
-	if p.EP > p.EPMax() {
-		p.EP = p.EPMax()
-	}
 }
 
 func (p *Player) resetWeaponState() {
@@ -244,35 +235,4 @@ func (p *Player) ApplyBurn(ticks int) {
 
 func (p *Player) IsBurning() bool {
 	return p.BurnTimer > 0
-}
-
-func (p *Player) EPMax() int {
-	return p.Weapon.Stats().EPBonus + p.Secondary.Stats().EPBonus
-}
-
-func (p *Player) HasEP(n int) bool {
-	return p.EP >= n
-}
-
-func (p *Player) SpendEP(n int) bool {
-	if p.EP < n {
-		return false
-	}
-	p.EP -= n
-	return true
-}
-
-func (p *Player) EPRatio() float64 {
-	m := p.EPMax()
-	if m <= 0 {
-		return 0
-	}
-	r := float64(p.EP) / float64(m)
-	if r < 0 {
-		r = 0
-	}
-	if r > 1 {
-		r = 1
-	}
-	return r
 }

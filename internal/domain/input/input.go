@@ -2,7 +2,6 @@ package input
 
 type PlayerInput struct {
 	Up, Down, Left, Right bool
-	Parry                 bool // Space — только что нажат
 	Dash                  bool
 	Fire                  bool
 	FireReleased          bool

@@ -74,11 +74,16 @@ func (a *App) startGame(s setup.Settings) {
 		systems.StartTestRoom(w, a.mapKind)
 	}
 	g := game.New(w, ebiteninput.New(), a.music)
+
 	g.SetOnPlayerDied(func() {
 		a.current = death.New(g, a.music, func() {
 			a.openMenu()
 		})
 	})
+	g.SetOnExitToMenu(func() {
+		a.openMenu()
+	})
+
 	a.current = g
 }
 

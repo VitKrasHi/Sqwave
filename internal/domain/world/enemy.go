@@ -35,6 +35,7 @@ type EnemyStats struct {
 	AttackCooldownMin int
 	AttackCooldownMax int
 	SwingDuration     int
+	MeleeTriggerRange float64
 
 	PreferredMin     float64
 	PreferredMax     float64
@@ -158,19 +159,20 @@ var enemyStats = map[EnemyType]EnemyStats{
 	EnemyInfantry: {
 		Name:              "Infantry",
 		MaxHP:             120,
-		SP:                100,
-		Damage:            35,
+		SP:                150,
+		Damage:            15,
 		Size:              24,
-		MeleeRange:        55,
+		MeleeRange:        60,
+		MeleeTriggerRange: 140,
 		AttackCooldownMin: 24, // 400 мс
 		AttackCooldownMax: 60, // 1 сек
-		SwingDuration:     5,
+		SwingDuration:     7,
 	},
 	EnemyShooter: {
 		Name:              "Shooter",
 		MaxHP:             100,
 		SP:                80,
-		Damage:            25,
+		Damage:            10,
 		Size:              22,
 		MeleeRange:        0,
 		AttackCooldownMin: 90,
@@ -185,7 +187,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		Name:              "Scout",
 		MaxHP:             70,
 		SP:                200,
-		Damage:            10, // на пеллету, 8 пеллет — до 80 в упор
+		Damage:            5, // на пеллету, 8 пеллет — до 80 в упор
 		Size:              20,
 		MeleeRange:        60, // дистанция выстрела дробью
 		AttackCooldownMin: 50,
@@ -211,17 +213,17 @@ var enemyStats = map[EnemyType]EnemyStats{
 		Name:              "Rammer",
 		MaxHP:             200,
 		SP:                100,
-		Damage:            50, // урон щитом в ближнем бою
+		Damage:            25, // урон щитом в ближнем бою
 		Size:              28,
 		MeleeRange:        70,
 		AttackCooldownMin: 40,
 		AttackCooldownMax: 70,
-		SwingDuration:     8,
+		SwingDuration:     10,
 		DashSpeedMul:      4.0,
 		DashDuration:      50,
 		DashCooldownMin:   60,
 		DashCooldownMax:   140,
-		DashDamage:        100, // ×2 от базового 50
+		DashDamage:        50, // ×2 от базового 50
 	},
 	EnemySniper: {
 		Name:              "Sniper",
@@ -233,7 +235,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		SniperIdleMin:     60,
 		SniperIdleMax:     300,
 		SniperDamageMin:   50,
-		SniperDamageMax:   200,
+		SniperDamageMax:   50,
 	},
 	EnemyRocketeer: {
 		Name:                  "Rocketeer",
@@ -273,7 +275,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		FleerTurnRate:  0.035, // ~2° за тик, полный оборот ~3 сек
 		FleerConeWidth: 40,    // узкий конус (полный угол)
 		FleerGrabRange: 55,
-		FleerLatchDmg:  1, // HP за тик при захвате
+		FleerLatchDmg:  0, // HP за тик при захвате
 	},
 	EnemyEngineer: {
 		Name:              "Engineer",
@@ -300,7 +302,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		TurretHP:          60,
 		TurretSize:        20,
 		TurretDetectRange: 550,
-		TurretProjSpeed:   7,
+		TurretProjSpeed:   15,
 		TurretProjSize:    5,
 		TurretProjLife:    60,
 		TurretProjDamage:  15,
@@ -328,7 +330,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		FlameBurnTicks:   600,   // 10 сек
 		FlameBurnRate:    60,    // 1 урон раз в секунду
 		WeaponTurnRate:   0.035, // ~2°/тик, полный оборот ~3 сек
-		WeaponArcDegrees: 25,    // стреляет, если оружие в 25° от игрока
+		WeaponArcDegrees: 20,    // стреляет, если оружие в 25° от игрока
 	},
 	EnemyProtector: {
 		Name:         "Protector",
@@ -376,8 +378,8 @@ var enemyStats = map[EnemyType]EnemyStats{
 		ProjectileLife:  45,
 		ProjectileCount: 1,
 
-		MGMaxDamage:   25, // в упор
-		MGMinDamage:   6,  // на пределе
+		MGMaxDamage:   10, // в упор
+		MGMinDamage:   1,  // на пределе
 		MGBurstCount:  6,  // 6 выстрелов в очереди
 		MGBurstGap:    3,  // очень быстро
 		MGCooldown:    90, // 1.5 сек между очередями
@@ -405,7 +407,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		SP:    100,
 		Size:  20,
 
-		GhostContactDamage: 20,
+		GhostContactDamage: 10,
 		GhostContactRange:  40,
 		GhostContactCool:   45, // 0.75 сек между ударами
 	},
@@ -520,6 +522,21 @@ type Enemy struct {
 	DashDirY     float64
 	DashCooldown int
 	DashHit      bool
+
+	// Melee lunge (общий для пехоты и меча тарана).
+	SwingTargetX float64 // позиция игрока в момент начала замаха
+	SwingTargetY float64
+	LungeActive  bool // выполняется рывок после замаха
+	LungeTimer   int
+	LungeDur     int
+	LungeDirX    float64
+	LungeDirY    float64
+	LungeSpeed   float64
+	LungeHit     bool // уже нанёс урон в этом рывке
+
+	// Таран: замах перед рывком (замедление).
+	DashWindup      bool
+	DashWindupTimer int
 
 	// Снайпер.
 	SniperState      int

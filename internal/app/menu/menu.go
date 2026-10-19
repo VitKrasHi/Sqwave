@@ -7,6 +7,7 @@ import (
 
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/particles"
+	"Sqwave/internal/app/settings"
 	"Sqwave/internal/domain/world"
 	"Sqwave/internal/infra/audio"
 
@@ -24,14 +25,16 @@ type Menu struct {
 	selected int
 	ps       []particles.Particle
 
-	music *audio.Player
+	music    *audio.Player
+	settings *settings.Panel
 }
 
 func New(music *audio.Player, onStart, onExit func()) *Menu {
 	m := &Menu{
-		onStart: onStart,
-		onExit:  onExit,
-		music:   music,
+		onStart:  onStart,
+		onExit:   onExit,
+		music:    music,
+		settings: settings.New(music),
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	m.buildButtons()
@@ -45,12 +48,14 @@ func (m *Menu) buildButtons() {
 		btnW = 260.0
 		btnH = 54.0
 		btnX = 60.0
-		btnY = 320.0
-		gap  = 20.0
+		btnY = 300.0
+		gap  = 18.0
 	)
 	m.buttons = []*Button{
 		{Label: "Create game", X: btnX, Y: btnY, W: btnW, H: btnH, Action: m.onStart},
-		{Label: "Exit", X: btnX, Y: btnY + btnH + gap, W: btnW, H: btnH, Action: m.onExit},
+		{Label: "Settings", X: btnX, Y: btnY + btnH + gap, W: btnW, H: btnH,
+			Action: func() { m.settings.Open = true; m.settings.Selected = settings.SelVolume }},
+		{Label: "Exit", X: btnX, Y: btnY + (btnH+gap)*2, W: btnW, H: btnH, Action: m.onExit},
 	}
 }
 
@@ -61,6 +66,14 @@ func (m *Menu) Update() error {
 
 	particles.Update(m.ps, panelW+20, float64(world.ScreenWidth)-20,
 		20, float64(world.ScreenHeight)-20)
+
+	// Если открыты настройки — обрабатываем только их.
+	if m.settings.Open {
+		if m.settings.Update() {
+			m.settings.Open = false
+		}
+		return nil
+	}
 
 	mx, my := ebiten.CursorPosition()
 	fx, fy := float64(mx), float64(my)
@@ -108,8 +121,11 @@ func (m *Menu) Draw(r game.SceneRenderer) {
 		b.Draw(r, i == m.selected)
 	}
 
-	r.DrawScreenText("Arrows / W S select   Enter confirm",
+	r.DrawScreenText("Arrows UP/DOWN W S select   Enter confirm",
 		60, sh-60, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
 	r.DrawScreenText("F11 fullscreen",
 		60, sh-40, color.NRGBA{R: 90, G: 110, B: 140, A: 255})
+
+	// Settings panel — поверх всего.
+	m.settings.Draw(r)
 }

@@ -13,6 +13,9 @@ const defendSpawnAttackCooldown = 30
 // StepDefendObjectives — логика Defend-волны.
 // Обновляет приоритеты врагов, атакует спавны, проверяет
 // условия победы/поражения.
+// StepDefendObjectives — логика Defend-волны.
+// Обновляет приоритеты врагов, атакует спавны, проверяет
+// условия победы/поражения.
 func StepDefendObjectives(w *world.World) {
 	ws := &w.Wave
 	if ws.Kind != world.WaveKindDefend || !ws.Active {
@@ -53,47 +56,30 @@ func StepDefendObjectives(w *world.World) {
 		}
 	}
 
-	// Далеко ли игрок от ближайшего спавна?
-	nd := w.NearestSpawnDist()
-	playerFar := nd > defendPlayerLeashDist || nd < 0
-
-	// Обновляем приоритеты.
+	// Обновляем приоритеты и атаку врагов.
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
 		if e.IsDead() || e.GroupID == 0 {
 			continue
 		}
 
-		if playerFar {
-			// Игрок далеко — все идут на спавн.
-			if e.TargetSpawnIdx < 0 {
-				e.TargetSpawnIdx = pickNearestSpawn(w, e)
-			} else {
-				// Цель-спавн могла быть уничтожена.
-				if e.TargetSpawnIdx >= len(w.SpawnPoints) ||
-					w.SpawnPoints[e.TargetSpawnIdx].IsDead() {
-					e.TargetSpawnIdx = pickNearestSpawn(w, e)
-				}
-			}
-		} else {
-			// Игрок близко — возвращаем изначальное намерение.
-			// 75% идут на игрока (OriginalTargetSpawn = -1),
-			// 25% остаются на спавне.
-			desired := e.OriginalTargetSpawn
+		// Восстанавливаем изначальное намерение.
+		desired := e.OriginalTargetSpawn
 
-			if desired >= 0 {
-				// Проверяем, что спавн ещё жив.
-				if desired >= len(w.SpawnPoints) ||
-					w.SpawnPoints[desired].IsDead() {
-					// Целевой спавн убит — ищем другой или на игрока.
-					next := pickNearestSpawn(w, e)
-					desired = next // может быть -1
+		// Если целевой спавн уничтожен — ищем другой живой.
+		if desired >= 0 {
+			if desired >= len(w.SpawnPoints) ||
+				w.SpawnPoints[desired].IsDead() {
+				desired = pickNearestSpawn(w, e)
+				if desired < 0 {
+					// Спавнов не осталось — идём на игрока.
+					desired = -1
 				}
 			}
-			e.TargetSpawnIdx = desired
 		}
+		e.TargetSpawnIdx = desired
 
-		// Атака спавна (если цель — спавн и враг рядом).
+		// Атака спавна.
 		if e.TargetSpawnIdx >= 0 && e.TargetSpawnIdx < len(w.SpawnPoints) {
 			sp := &w.SpawnPoints[e.TargetSpawnIdx]
 			if !sp.IsDead() {

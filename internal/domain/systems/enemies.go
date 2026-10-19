@@ -97,9 +97,15 @@ func StepEnemies(w *world.World) {
 			e.FacingY = dy / dist
 		}
 
-		moved := math.Hypot(e.X-e.LastX, e.Y-e.LastY)
-		if moved < 0.4 {
-			e.StuckTicks++
+		inAttack := e.SwingActive || e.LungeActive || e.DashWindup || e.DashActive
+
+		if !inAttack {
+			moved := math.Hypot(e.X-e.LastX, e.Y-e.LastY)
+			if moved < 0.4 {
+				e.StuckTicks++
+			} else {
+				e.StuckTicks = 0
+			}
 		} else {
 			e.StuckTicks = 0
 		}

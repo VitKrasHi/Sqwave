@@ -7,6 +7,8 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
+const rammerDashWindupTicks = 15 // ~0.25 сек замедления перед рывком
+
 func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
 	size := stats.Size
@@ -15,27 +17,23 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 		e.DashCooldown--
 	}
 
-	// --- Активный рывок ---
+	// --- Активный рывок (молот) ---
 	if e.DashActive {
 		e.DashTimer++
 
-		// Движение по фиксированному направлению.
 		speed := e.Speed() * stats.DashSpeedMul
 		dx := e.DashDirX * speed
 		dy := e.DashDirY * speed
 
 		wallHit := false
 
-		targetX := e.X + dx
-		if !rammerHitsWall(w, geometry.Rect{X: targetX, Y: e.Y, W: size, H: size}) {
-			e.X = targetX
+		if !rammerHitsWall(w, geometry.Rect{X: e.X + dx, Y: e.Y, W: size, H: size}) {
+			e.X += dx
 		} else {
 			wallHit = true
 		}
-
-		targetY := e.Y + dy
-		if !rammerHitsWall(w, geometry.Rect{X: e.X, Y: targetY, W: size, H: size}) {
-			e.Y = targetY
+		if !rammerHitsWall(w, geometry.Rect{X: e.X, Y: e.Y + dy, W: size, H: size}) {
+			e.Y += dy
 		} else {
 			wallHit = true
 		}
@@ -57,39 +55,48 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 			wallHit = true
 		}
 
-		// Проверка попадания по игроку — урон один раз за рывок,
-		// но рывок НЕ прерывается.
 		if !e.DashHit && rammerHitsPlayer(e, &w.Player) {
 			dmg := int(float64(stats.DashDamage) * e.DamageMul())
 			TryMeleeDamage(w, e, dmg)
 			e.DashHit = true
 		}
 
-		// Рывок прерывается только по времени или по стене.
 		if wallHit || e.DashTimer >= stats.DashDuration {
 			endRammerDash(w, e, stats)
 		}
 		return
 	}
 
-	// --- Замах щитом в ближнем бою ---
-	if e.SwingActive {
-		e.SwingTimer++
-		if e.SwingTimer >= stats.SwingDuration {
-			e.SwingActive = false
+	// --- Замах перед рывком (замедление) ---
+	if e.DashWindup {
+		e.DashWindupTimer--
 
-			ecx, ecy = e.Center()
-			pcx2, pcy2 := w.Player.Center()
-			d := math.Hypot(pcx2-ecx, pcy2-ecy)
-
-			if d <= stats.MeleeRange && hasLineOfSight(w, ecx, ecy, pcx2, pcy2) {
-				dmg := int(float64(stats.Damage) * e.DamageMul())
-				TryMeleeDamage(w, e, dmg)
-			}
-
-			span := stats.AttackCooldownMax - stats.AttackCooldownMin
-			e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
+		if hasLineOfSight(w, ecx, ecy, pcx, pcy) && dist > 0.01 {
+			dx := (pcx - ecx) / dist
+			dy := (pcy - ecy) / dist
+			speed := e.Speed() * 0.3
+			moveEnemyX(w, e, dx*speed)
+			moveEnemyY(w, e, dy*speed)
 		}
+
+		if e.DashWindupTimer <= 0 {
+			e.DashWindup = false
+			aimX := pcx - ecx
+			aimY := pcy - ecy
+			l := math.Hypot(aimX, aimY)
+			if l > 0.01 {
+				e.DashActive = true
+				e.DashTimer = 0
+				e.DashDirX = aimX / l
+				e.DashDirY = aimY / l
+				e.DashHit = false
+			}
+		}
+		return
+	}
+
+	// --- Melee-фазы (меч тарана) ---
+	if processMeleeAttack(w, e, stats) {
 		return
 	}
 
@@ -97,32 +104,23 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 		e.AttackTimer--
 	}
 
-	// --- Ближний бой ---
-	if dist <= stats.MeleeRange && e.AttackTimer == 0 &&
-		hasLineOfSight(w, ecx, ecy, pcx, pcy) {
+	los := hasLineOfSight(w, ecx, ecy, pcx, pcy)
+
+	if dist <= stats.MeleeRange && e.AttackTimer == 0 && los {
 		e.SwingActive = true
 		e.SwingTimer = 0
+		e.SwingTargetX = pcx
+		e.SwingTargetY = pcy
 		return
 	}
 
-	// --- Игрок вне радиуса — тараним ---
-	if dist > stats.MeleeRange && e.DashCooldown == 0 &&
-		hasLineOfSight(w, ecx, ecy, pcx, pcy) {
-		aimX := pcx - ecx
-		aimY := pcy - ecy
-		l := math.Hypot(aimX, aimY)
-		if l > 0.01 {
-			e.DashActive = true
-			e.DashTimer = 0
-			e.DashDirX = aimX / l
-			e.DashDirY = aimY / l
-			e.DashHit = false
-			return
-		}
+	if dist > stats.MeleeRange && e.DashCooldown == 0 && los {
+		e.DashWindup = true
+		e.DashWindupTimer = rammerDashWindupTicks
+		return
 	}
 
-	// --- Обычная ходьба ---
-	if hasLineOfSight(w, ecx, ecy, pcx, pcy) {
+	if los {
 		moveEnemyDirect(w, e, ecx, ecy, pcx, pcy)
 	} else {
 		moveEnemyViaPath(w, e, ecx, ecy, pcx, pcy)
@@ -136,8 +134,6 @@ func endRammerDash(w *world.World, e *world.Enemy, stats world.EnemyStats) {
 	e.DashCooldown = stats.DashCooldownMin + w.Rng.Intn(span+1)
 }
 
-// rammerHitsWall — проверка только стен, без врагов.
-// Таран продавливает союзников, но останавливается о стены.
 func rammerHitsWall(w *world.World, r geometry.Rect) bool {
 	for _, wall := range w.Walls {
 		if r.Intersects(wall) {
@@ -147,7 +143,6 @@ func rammerHitsWall(w *world.World, r geometry.Rect) bool {
 	return false
 }
 
-// rammerHitsPlayer — пересекается ли хитбокс тарана с игроком.
 func rammerHitsPlayer(e *world.Enemy, p *world.Player) bool {
 	return e.Rect().Intersects(p.Rect())
 }

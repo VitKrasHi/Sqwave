@@ -305,3 +305,117 @@ func gridWithAgents(base *geometry.Grid, enemies []world.Enemy, skip *world.Enem
 	}
 	return copyGrid
 }
+
+// processMeleeAttack — замах (стоит, фиксирует точку) → рывок к точке →
+// удар в конусе 75° от направления рывка.
+// Рывок имеет фиксированную длительность (LungeDur = 12 тиков),
+// скорость подбирается под дистанцию.
+func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) bool {
+	pcx, pcy := w.Player.Center()
+
+	// Половина конуса удара (75° полный угол → 37.5° в каждую сторону).
+	const halfConeDeg = 75.0 / 2.0
+	cosHalfCone := math.Cos(halfConeDeg * math.Pi / 180)
+
+	// Фиксированная длительность рывка.
+	const lungeDur = 12
+
+	// checkHit — проверяет, попадает ли игрок в конус удара
+	// с вершиной в точке SwingTarget и направлением dirX/dirY.
+	checkHit := func(originX, originY, dirX, dirY float64) bool {
+		d := math.Hypot(pcx-originX, pcy-originY)
+		if d > stats.MeleeRange {
+			return false
+		}
+		if d < 1 {
+			return true
+		}
+		toPX := (pcx - originX) / d
+		toPY := (pcy - originY) / d
+		dot := toPX*dirX + toPY*dirY
+		return dot >= cosHalfCone
+	}
+
+	// --- Фаза рывка ---
+	if e.LungeActive {
+		e.LungeTimer++
+
+		moveEnemyX(w, e, e.LungeDirX*e.LungeSpeed)
+		moveEnemyY(w, e, e.LungeDirY*e.LungeSpeed)
+		e.FacingX = e.LungeDirX
+		e.FacingY = e.LungeDirY
+
+		// Удар — только в последний тик рывка.
+		if e.LungeTimer >= e.LungeDur {
+			if checkHit(e.SwingTargetX, e.SwingTargetY, e.LungeDirX, e.LungeDirY) {
+				dmg := int(float64(stats.Damage) * e.DamageMul())
+				TryMeleeDamage(w, e, dmg)
+			}
+
+			e.LungeActive = false
+			e.LungeTimer = 0
+			span := stats.AttackCooldownMax - stats.AttackCooldownMin
+			e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
+		}
+		return true
+	}
+
+	// --- Фаза замаха: враг стоит на месте ---
+	if e.SwingActive {
+		e.SwingTimer++
+
+		// Стоим, только поворачиваемся к игроку для визуала.
+		ecx, ecy := e.Center()
+		dx := pcx - ecx
+		dy := pcy - ecy
+		l := math.Hypot(dx, dy)
+		if l > 0.01 {
+			e.FacingX = dx / l
+			e.FacingY = dy / l
+		}
+
+		if e.SwingTimer >= stats.SwingDuration {
+			e.SwingActive = false
+			e.SwingTimer = 0
+
+			// Рывок к зафиксированной точке.
+			ecx, ecy = e.Center()
+			dx = e.SwingTargetX - ecx
+			dy = e.SwingTargetY - ecy
+			l = math.Hypot(dx, dy)
+
+			if l < 2 {
+				// Уже в точке — мгновенный удар.
+				dirX := e.FacingX
+				dirY := e.FacingY
+				if dirX == 0 && dirY == 0 {
+					dirX, dirY = 1, 0
+				}
+				if checkHit(e.SwingTargetX, e.SwingTargetY, dirX, dirY) {
+					dmg := int(float64(stats.Damage) * e.DamageMul())
+					TryMeleeDamage(w, e, dmg)
+				}
+				span := stats.AttackCooldownMax - stats.AttackCooldownMin
+				e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
+				return true
+			}
+
+			// Фиксированная длительность рывка, скорость под дистанцию.
+			e.LungeActive = true
+			e.LungeTimer = 0
+			e.LungeDur = lungeDur
+			e.LungeDirX = dx / l
+			e.LungeDirY = dy / l
+			e.LungeSpeed = l / float64(e.LungeDur)
+			if e.LungeSpeed > 20 {
+				e.LungeSpeed = 20
+			}
+			if e.LungeSpeed < 3 {
+				e.LungeSpeed = 3
+			}
+		}
+		return true
+	}
+
+	return false
+}
