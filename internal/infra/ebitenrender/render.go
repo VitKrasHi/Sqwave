@@ -2,29 +2,34 @@ package ebitenrender
 
 import (
 	"image/color"
+	"io/fs"
 	"log"
 	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	text "github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font/basicfont"
 )
 
+var screenTextFace = text.NewGoXFace(basicfont.Face7x13)
+
 var (
-	imageCache   = map[string]*ebiten.Image{}
-	imageCacheMu sync.Mutex
+	imageCache    = map[string]*ebiten.Image{}
+	imageErrCache = map[string]bool{}
+	imageCacheMu  sync.Mutex
 )
 
 type Renderer struct {
 	screen     *ebiten.Image
 	camX, camY float64
 	zoom       float64
+	fs         fs.FS
 }
 
-func New(screen *ebiten.Image) *Renderer {
-	return &Renderer{screen: screen, zoom: 1.0}
+func New(screen *ebiten.Image, fsys fs.FS) *Renderer {
+	return &Renderer{screen: screen, zoom: 1.0, fs: fsys}
 }
 
 func (r *Renderer) Clear(c color.NRGBA) {
@@ -60,6 +65,16 @@ func (r *Renderer) DrawLine(x1, y1, x2, y2, thickness float64, c color.NRGBA) {
 	)
 }
 
+func (r *Renderer) DrawCircle(x, y, radius float64, c color.NRGBA) {
+	sx, sy := r.w2s(x, y)
+	vector.DrawFilledCircle(r.screen, float32(sx), float32(sy), float32(radius*r.zoom), c, true)
+}
+
+func (r *Renderer) DrawWorldCell(x, y, size float64, c color.NRGBA) {
+	sx, sy := r.w2s(x, y)
+	ebitenutil.DrawRect(r.screen, sx, sy, size*r.zoom, size*r.zoom, c)
+}
+
 func (r *Renderer) DrawScreenRect(x, y, w, h float64, c color.NRGBA) {
 	ebitenutil.DrawRect(r.screen, x, y, w, h, c)
 }
@@ -75,21 +90,9 @@ func (r *Renderer) DrawScreenLine(x1, y1, x2, y2, thickness float64, c color.NRG
 	)
 }
 
-func (r *Renderer) DrawText(text string, x, y float64) {
-	ebitenutil.DebugPrintAt(r.screen, text, int(x), int(y))
-}
-
-func (r *Renderer) DrawCircle(x, y, radius float64, c color.NRGBA) {
-	sx, sy := r.w2s(x, y)
-	vector.DrawFilledCircle(r.screen, float32(sx), float32(sy), float32(radius*r.zoom), c, true)
-}
-
-var screenTextFace = text.NewGoXFace(basicfont.Face7x13)
-
-// DrawScreenText — цветной текст в экранных координатах.
 func (r *Renderer) DrawScreenText(s string, x, y float64, c color.NRGBA) {
 	op := &text.DrawOptions{}
-	op.GeoM.Translate(x, y+13) // +13 = ascent для basicfont.Face7x13
+	op.GeoM.Translate(x, y+13)
 	op.ColorScale.ScaleWithColor(c)
 	text.Draw(r.screen, s, screenTextFace, op)
 }
@@ -103,21 +106,43 @@ func (r *Renderer) DrawScreenTextScaled(s string, x, y, scale float64, c color.N
 	text.Draw(r.screen, s, screenTextFace, op)
 }
 
-func (r *Renderer) DrawWorldCell(x, y, size float64, c color.NRGBA) {
-	sx, sy := r.w2s(x, y)
-	ebitenutil.DrawRect(r.screen, sx, sy, size*r.zoom, size*r.zoom, c)
+func (r *Renderer) DrawText(s string, x, y float64) {
+	ebitenutil.DebugPrintAt(r.screen, s, int(x), int(y))
 }
 
+// DrawScreenImage — загружает картинку из встроенной fs.FS.
 func (r *Renderer) DrawScreenImage(path string, x, y, w, h float64) {
 	imageCacheMu.Lock()
+	if imageErrCache[path] {
+		imageCacheMu.Unlock()
+		r.DrawScreenRect(x, y, w, h, color.NRGBA{R: 20, G: 0, B: 0, A: 255})
+		r.DrawScreenTextScaled("IMAGE NOT FOUND", x+20, y+h/2, 2.0,
+			color.NRGBA{R: 255, G: 40, B: 40, A: 255})
+		return
+	}
 	img, ok := imageCache[path]
 	imageCacheMu.Unlock()
 
 	if !ok {
-		loaded, _, err := ebitenutil.NewImageFromFile(path)
+		f, err := r.fs.Open(path)
 		if err != nil {
-			log.Printf("DrawScreenImage: failed to load %q: %v", path, err)
-			// Рисуем заглушку вместо картинки.
+			log.Printf("DrawScreenImage: open %q: %v", path, err)
+			imageCacheMu.Lock()
+			imageErrCache[path] = true
+			imageCacheMu.Unlock()
+			r.DrawScreenRect(x, y, w, h, color.NRGBA{R: 20, G: 0, B: 0, A: 255})
+			r.DrawScreenTextScaled("IMAGE NOT FOUND", x+20, y+h/2, 2.0,
+				color.NRGBA{R: 255, G: 40, B: 40, A: 255})
+			return
+		}
+		defer f.Close()
+
+		loaded, _, err := ebitenutil.NewImageFromReader(f)
+		if err != nil {
+			log.Printf("DrawScreenImage: decode %q: %v", path, err)
+			imageCacheMu.Lock()
+			imageErrCache[path] = true
+			imageCacheMu.Unlock()
 			r.DrawScreenRect(x, y, w, h, color.NRGBA{R: 20, G: 0, B: 0, A: 255})
 			r.DrawScreenTextScaled("IMAGE NOT FOUND", x+20, y+h/2, 2.0,
 				color.NRGBA{R: 255, G: 40, B: 40, A: 255})

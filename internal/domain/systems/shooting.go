@@ -9,12 +9,13 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
+// StepShooting — диспетчер стрельбы: melee, снайперка с зарядкой,
+// автоматическое оружие (пистолет/автомат/дробовик/ракетница).
 func StepShooting(w *world.World, in input.PlayerInput) {
 	p := &w.Player
 	if !p.HasWeapon() {
 		return
 	}
-
 	if p.FireCooldownTimer > 0 {
 		p.FireCooldownTimer--
 	}
@@ -29,12 +30,12 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 		return
 	}
 
-	// Автоматическое оружие: сброс заряда не нужен, он и так нулевой.
+	// Автоматическое оружие.
 	p.AimCharge = 0
-
 	if !in.Fire || p.FireCooldownTimer > 0 {
 		return
 	}
+
 	weapon := p.Weapon.Stats()
 	cx, cy := p.Center()
 	aimDX := in.AimX - cx
@@ -56,9 +57,7 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	p.FireCooldownTimer = weapon.FireCooldown
 }
 
-// stepSniper: зажал → копится заряд, отпустил → выстрел.
-// Если отпустил без накопления (быстрый клик) — всё равно стреляет,
-// но с минимальным зарядом.
+// stepPlayerSniper — зажал ЛКМ → копится заряд, отпустил → выстрел.
 func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 	p := &w.Player
 	weapon := p.Weapon.Stats()
@@ -80,7 +79,10 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 		}
 		baseAngle := math.Atan2(aimDY, aimDX)
 
-		chargeRatio := float64(p.AimCharge) / float64(weapon.ChargeTime)
+		chargeRatio := 0.0
+		if weapon.ChargeTime > 0 {
+			chargeRatio = float64(p.AimCharge) / float64(weapon.ChargeTime)
+		}
 		if chargeRatio > 1 {
 			chargeRatio = 1
 		}
@@ -94,6 +96,8 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 	}
 }
 
+// stepMelee — замах меча/щита. Урон наносится каждый тик через applyMeleeHit,
+// один и тот же враг получает удар не больше одного раза за замах (SwingID).
 func stepMelee(w *world.World, in input.PlayerInput) {
 	p := &w.Player
 	weapon := p.Weapon.Stats()
@@ -135,92 +139,9 @@ func stepMelee(w *world.World, in input.PlayerInput) {
 	}
 }
 
-// applyMeleeHit проверяет текущее положение клинка против всех врагов.
-// Один замах может задеть каждого врага только один раз — за это
-// отвечает LastSwingHitID. Клинок обрезается о стены: врагов за
-// стеной удар не достаёт.
-func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
-	cx, cy := p.Center()
-	progress := p.SwingProgress()
-
-	var bladeAngle, reach float64
-	if weapon.IsThrust {
-		reach = p.Swing.Range * math.Sin(progress*math.Pi)
-		bladeAngle = p.Swing.StartAngle
-	} else {
-		bladeAngle = p.Swing.StartAngle + p.Swing.ArcRadians*progress
-		reach = p.Swing.Range
-	}
-
-	maxEndX := cx + math.Cos(bladeAngle)*reach
-	maxEndY := cy + math.Sin(bladeAngle)*reach
-
-	// Ищем ближайшее пересечение со стенами — клинок обрезается по нему.
-	// Тот же приём, что и в fireRay.
-	wallT := 1.0
-	for _, wall := range w.Walls {
-		if t, ok := geometry.RaySegmentIntersectsRect(cx, cy, maxEndX, maxEndY, wall); ok {
-			if t < wallT {
-				wallT = t
-			}
-		}
-	}
-
-	endX := cx + (maxEndX-cx)*wallT
-	endY := cy + (maxEndY-cy)*wallT
-
-	for i := range w.Enemies {
-		e := &w.Enemies[i]
-		if e.IsDead() {
-			continue
-		}
-		if e.LastSwingHitID == p.SwingID {
-			continue
-		}
-		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, e.Rect()); !ok {
-			continue
-		}
-
-		if e.Invulnerable {
-			continue
-		}
-
-		if BlocksDamageFrom(e, cx, cy) {
-			continue
-		}
-
-		e.LastSwingHitID = p.SwingID
-
-		if weapon.KnockbackForce > 0 {
-			dx := e.X - cx
-			dy := e.Y - cy
-			l := math.Hypot(dx, dy)
-			if l > 0.01 {
-				e.KnockbackVX = dx / l * weapon.KnockbackForce
-				e.KnockbackVY = dy / l * weapon.KnockbackForce
-				e.KnockbackTimer = 8
-			}
-		} else {
-			dmg := p.Weapon.DamageAt(0, 1)
-			e.TakeDamage(dmg)
-		}
-	}
-	// Вражеские спавны.
-	for i := range w.SpawnPoints {
-		sp := &w.SpawnPoints[i]
-		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
-			continue
-		}
-		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, sp.Rect()); ok {
-			dmg := p.Weapon.DamageAt(0, 1)
-			sp.Damage(dmg)
-		}
-	}
-}
-
-// fireRay пускает один hitscan-луч под заданным углом и создаёт Bullet-отрезок.
-// fireRay пускает луч, ищет ближайшее попадание среди стен и врагов
-// и наносит урон, если попал во врага.
+// fireRay пускает hitscan-луч. Ищет ближайшее попадание среди стен,
+// врагов, турелей, зацепленных гарпунов и вражеских спавнов.
+// Урон наносится в зависимости от того, во что попал.
 func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	weapon := w.Player.Weapon.Stats()
 	cos := math.Cos(angle)
@@ -241,11 +162,13 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		}
 	}
 
-	// Ближайший враг или турель до стены.
 	enemyT := wallT
 	var hitEnemy *world.Enemy
+	var hitTurret *world.Turret
+	var hitHarpoon *world.Harpoon
 	var hitSpawn *world.SpawnPoint
 
+	// Враги.
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
 		if e.IsDead() {
@@ -255,9 +178,14 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 			if t < enemyT {
 				enemyT = t
 				hitEnemy = e
+				hitTurret = nil
+				hitHarpoon = nil
+				hitSpawn = nil
 			}
 		}
 	}
+
+	// Турели (неуязвимы, но блокируют выстрел).
 	for i := range w.Turrets {
 		t := &w.Turrets[i]
 		if t.IsDead() {
@@ -266,10 +194,31 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, t.Rect()); ok {
 			if tt < enemyT {
 				enemyT = tt
+				hitTurret = t
 				hitEnemy = nil
+				hitHarpoon = nil
+				hitSpawn = nil
 			}
 		}
 	}
+
+	// Зацепленные гарпуны.
+	for i := range w.Harpoons {
+		hp := &w.Harpoons[i]
+		if hp.IsDead() || !hp.Attached {
+			continue
+		}
+		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, hp.Rect()); ok {
+			if tt < enemyT {
+				enemyT = tt
+				hitHarpoon = hp
+				hitEnemy = nil
+				hitTurret = nil
+				hitSpawn = nil
+			}
+		}
+	}
+
 	// Вражеские спавны.
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
@@ -281,22 +230,8 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 				enemyT = tt
 				hitSpawn = sp
 				hitEnemy = nil
-			}
-		}
-	}
-
-	// Гарпун (прицепленный к игроку) можно отстрелить.
-	var hitHarpoon *world.Harpoon
-	for i := range w.Harpoons {
-		hp := &w.Harpoons[i]
-		if hp.IsDead() || !hp.Attached {
-			continue
-		}
-		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, hp.Rect()); ok {
-			if tt < enemyT {
-				enemyT = tt
-				hitHarpoon = hp
-				hitEnemy = nil
+				hitTurret = nil
+				hitHarpoon = nil
 			}
 		}
 	}
@@ -305,31 +240,30 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	endY := startY + (maxEndY-startY)*enemyT
 
 	if hitEnemy != nil {
-		if hitEnemy.Invulnerable {
-			// Попадание зарегистрировано визуально, но урона нет.
-		} else if BlocksDamageFrom(hitEnemy, startX, startY) {
-			// Урон заблокирован щитом танка.
-		} else if hitHarpoon != nil {
-			dmg := w.Player.Weapon.DamageAt(0, 1)
-			hitHarpoon.Damage(dmg)
-			if hitHarpoon.IsDead() {
-				p := &w.Player
-				if p.Harpooned && p.HarpoonID == hitHarpoon.ID {
-					p.Harpooned = false
-					p.HarpoonID = -1
-				}
-			}
-		} else if hitSpawn != nil {
-			distance := enemyT * weapon.Range
-			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
-			hitSpawn.Damage(dmg)
-		} else {
+		if !hitEnemy.Invulnerable && !BlocksDamageFrom(hitEnemy, startX, startY) {
 			distance := enemyT * weapon.Range
 			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
 			hitEnemy.TakeDamage(dmg)
 		}
+	} else if hitTurret != nil {
+		// Турели неуязвимы до конца волны.
+	} else if hitHarpoon != nil {
+		dmg := w.Player.Weapon.DamageAt(0, 1)
+		hitHarpoon.Damage(dmg)
+		if hitHarpoon.IsDead() {
+			p := &w.Player
+			if p.Harpooned && p.HarpoonID == hitHarpoon.ID {
+				p.Harpooned = false
+				p.HarpoonID = -1
+			}
+		}
+	} else if hitSpawn != nil {
+		distance := enemyT * weapon.Range
+		dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+		hitSpawn.Damage(dmg)
 	}
 
+	// Визуальный след выстрела.
 	w.Bullets = append(w.Bullets, world.Bullet{
 		StartX:  startX,
 		StartY:  startY,
@@ -341,16 +275,103 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 	})
 }
 
-func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
-	if spreadDeg <= 0 {
-		return 0
+// applyMeleeHit проверяет текущее положение клинка против врагов,
+// турелей и вражеских спавнов. Клинок обрезается о стены.
+func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
+	cx, cy := p.Center()
+	progress := p.SwingProgress()
+
+	var bladeAngle, reach float64
+	if weapon.IsThrust {
+		reach = p.Swing.Range * math.Sin(progress*math.Pi)
+		bladeAngle = p.Swing.StartAngle
+	} else {
+		bladeAngle = p.Swing.StartAngle + p.Swing.ArcRadians*progress
+		reach = p.Swing.Range
 	}
-	half := spreadDeg * math.Pi / 360
-	return (rng.Float64()*2 - 1) * half
+
+	maxEndX := cx + math.Cos(bladeAngle)*reach
+	maxEndY := cy + math.Sin(bladeAngle)*reach
+
+	// Обрезка о стены.
+	wallT := 1.0
+	for _, wall := range w.Walls {
+		if t, ok := geometry.RaySegmentIntersectsRect(cx, cy, maxEndX, maxEndY, wall); ok {
+			if t < wallT {
+				wallT = t
+			}
+		}
+	}
+
+	endX := cx + (maxEndX-cx)*wallT
+	endY := cy + (maxEndY-cy)*wallT
+
+	// Враги.
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() {
+			continue
+		}
+		if e.LastSwingHitID == p.SwingID {
+			continue
+		}
+		if e.Invulnerable {
+			continue
+		}
+		if BlocksDamageFrom(e, cx, cy) {
+			continue
+		}
+		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, e.Rect()); !ok {
+			continue
+		}
+
+		e.LastSwingHitID = p.SwingID
+
+		if weapon.KnockbackForce > 0 {
+			dx := e.X - cx
+			dy := e.Y - cy
+			l := math.Hypot(dx, dy)
+			if l > 0.01 {
+				e.KnockbackVX = dx / l * weapon.KnockbackForce
+				e.KnockbackVY = dy / l * weapon.KnockbackForce
+				e.KnockbackTimer = 8
+			}
+		} else {
+			dmg := p.Weapon.DamageAt(0, 1)
+			e.TakeDamage(dmg)
+		}
+	}
+
+	// Турели (неуязвимы, но проверка на всякий случай если когда-нибудь
+	// станут уязвимыми — просто раскомментировать t.Damage(dmg)).
+	for i := range w.Turrets {
+		t := &w.Turrets[i]
+		if t.IsDead() {
+			continue
+		}
+		if t.LastSwingHitID == p.SwingID {
+			continue
+		}
+		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, t.Rect()); ok {
+			t.LastSwingHitID = p.SwingID
+			// t.Damage(weapon.DamageAt(0, 1))
+		}
+	}
+
+	// Вражеские спавны.
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, sp.Rect()); ok {
+			dmg := p.Weapon.DamageAt(0, 1)
+			sp.Damage(dmg)
+		}
+	}
 }
 
-// spawnRocket создаёт движущийся снаряд. Life вычисляется так,
-// чтобы запас хода соответствовал weapon.Range.
+// spawnRocket создаёт движущийся снаряд ракетницы.
 func spawnRocket(w *world.World, cx, cy, angle float64, weapon world.WeaponStats) {
 	life := int(weapon.Range / weapon.ProjectileSpeed)
 	if life <= 0 {
@@ -368,4 +389,13 @@ func spawnRocket(w *world.World, cx, cy, angle float64, weapon world.WeaponStats
 		ExplosionRadius: weapon.ExplosionRadius,
 		ExplosionLife:   weapon.ExplosionLife,
 	})
+}
+
+// spreadOffset — случайный угол в диапазоне ±spreadDeg/2.
+func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
+	if spreadDeg <= 0 {
+		return 0
+	}
+	half := spreadDeg * math.Pi / 360
+	return (rng.Float64()*2 - 1) * half
 }

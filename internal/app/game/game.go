@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"os"
 
 	"Sqwave/internal/app/settings"
 	"Sqwave/internal/domain/geometry"
@@ -73,6 +74,19 @@ func (g *Game) SetOnExitToMenu(f func()) {
 }
 
 func (g *Game) Update() error {
+	if g.ticks == 0 {
+		wd, _ := os.Getwd()
+		println("CWD:", wd)
+		entries, err := os.ReadDir("cmd/client/assets/music")
+		if err != nil {
+			println("ReadDir err:", err.Error())
+		} else {
+			println("Files in cmd/client/assets/music:")
+			for _, e := range entries {
+				println("  ", e.Name())
+			}
+		}
+	}
 	g.ticks++
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
@@ -155,7 +169,9 @@ func (g *Game) Update() error {
 	systems.StepWaves(g.world)
 	if g.world.PendingTrack != "" {
 		if g.music != nil {
-			_ = g.music.PlayLoopForce(g.world.PendingTrack)
+			if err := g.music.PlayLoopForce(g.world.PendingTrack); err != nil {
+				println("AUDIO ERROR:", err.Error())
+			}
 		}
 		g.world.PendingTrack = ""
 	}

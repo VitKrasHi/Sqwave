@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,6 +20,7 @@ import (
 	"Sqwave/internal/app/setup"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
+	"Sqwave/internal/embedassets"
 	"Sqwave/internal/infra/audio"
 	"Sqwave/internal/infra/ebiteninput"
 	"Sqwave/internal/infra/ebitenrender"
@@ -28,6 +30,7 @@ type App struct {
 	current app.Scene
 	mapKind world.MapKind
 	music   *audio.Player
+	assets  fs.FS
 }
 
 func (a *App) Update() error {
@@ -43,7 +46,7 @@ func (a *App) Update() error {
 }
 
 func (a *App) Draw(screen *ebiten.Image) {
-	a.current.Draw(ebitenrender.New(screen))
+	a.current.Draw(ebitenrender.New(screen, a.assets))
 }
 
 func (a *App) Layout(_, _ int) (int, int) {
@@ -73,6 +76,7 @@ func (a *App) startGame(s setup.Settings) {
 	if a.mapKind != world.MapDefault {
 		systems.StartTestRoom(w, a.mapKind)
 	}
+
 	g := game.New(w, ebiteninput.New(), a.music)
 
 	g.SetOnPlayerDied(func() {
@@ -88,7 +92,7 @@ func (a *App) startGame(s setup.Settings) {
 }
 
 func main() {
-	mapName := flag.String("map", "default", "map: default|infantry|shooter|scout|medic|rammer|sniper|rocketeer")
+	mapName := flag.String("map", "default", "map: default|infantry|shooter|scout|medic|rammer|sniper|rocketeer|buffer|fleer|engineer|flamer|protector|tank|mg|summoner|harpooner")
 	fullscreen := flag.Bool("fullscreen", false, "start in fullscreen")
 	skipMenu := flag.Bool("skip-menu", false, "start directly in game (debug)")
 	profiler := flag.Bool("prof", false, "enable pprof on localhost:6060")
@@ -141,18 +145,15 @@ func main() {
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}
 
-	music, err := audio.New()
+	music, err := audio.New(embedassets.FS)
 	if err != nil {
 		fmt.Println("audio init failed:", err)
 	}
 
-	a := &App{mapKind: kind, music: music}
+	a := &App{mapKind: kind, music: music, assets: embedassets.FS}
 
 	if *skipMenu {
-		a.startGame(setup.Settings{
-			EnemiesPerWave: 100,
-			WavesLimit:     0,
-		})
+		a.startGame(setup.Settings{EnemiesPerWave: 100, WavesLimit: 0})
 	} else {
 		a.openMenu()
 	}

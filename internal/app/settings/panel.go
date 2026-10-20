@@ -146,7 +146,7 @@ func (p *Panel) Draw(r Renderer) {
 	r.DrawScreenRect(backX, backY, backW, backH, bgBtn)
 	r.DrawScreenTextScaled("Back", backX+20, backY+10, 1.6, textBtn)
 
-	r.DrawScreenText("↑/↓ select   ←/→ change   Enter confirm   Esc back",
+	r.DrawScreenText("UP/DOWN select   LEFT/RIGHT change   Enter confirm   Esc back",
 		px+40, py+panelH-30,
 		color.NRGBA{R: 110, G: 130, B: 160, A: 255})
 }

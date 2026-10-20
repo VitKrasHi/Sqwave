@@ -3,7 +3,7 @@ package audio
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"io/fs"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
@@ -16,12 +16,14 @@ type Player struct {
 	current *audio.Player
 	track   string
 	volume  float64
+	fs      fs.FS
 }
 
-func New() (*Player, error) {
+func New(fsys fs.FS) (*Player, error) {
 	return &Player{
 		ctx:    audio.NewContext(sampleRate),
-		volume: 0.2,
+		volume: 0.7,
+		fs:     fsys,
 	}, nil
 }
 
@@ -41,14 +43,16 @@ func (p *Player) PlayLoopForce(path string) error {
 }
 
 func (p *Player) playInternal(path string) error {
-	data, err := os.ReadFile(path)
+	data, err := fs.ReadFile(p.fs, path)
 	if err != nil {
 		return fmt.Errorf("audio: read %s: %w", path, err)
 	}
+
 	stream, err := wav.DecodeWithSampleRate(sampleRate, bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("audio: decode %s: %w", path, err)
 	}
+
 	loop := audio.NewInfiniteLoop(stream, stream.Length())
 	player, err := p.ctx.NewPlayer(loop)
 	if err != nil {
@@ -56,6 +60,7 @@ func (p *Player) playInternal(path string) error {
 	}
 	player.SetVolume(p.volume)
 	player.Play()
+
 	p.current = player
 	p.track = path
 	return nil

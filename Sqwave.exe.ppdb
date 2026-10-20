@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#Author: vito
+#Sqwave.exe
+#Rating=1-5
+export PW_WINE_USE="PROTON_LG_10-28"
+export PW_PREFIX_NAME="DEFAULT"
+export PORTPROTON_NAME="Sqwave"
+export FILE_DESCRIPTION=""
+export FILE_SHA256SUM="52c2d358a54518db9898cce86b54e1f3d7c151d0cb1f4c07f2d6f8516de8e2b1"
+export PW_VULKAN_USE="6"

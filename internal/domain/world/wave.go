@@ -146,99 +146,146 @@ func RandomWaveLevel(waveNumber int, rng intRng) int {
 }
 
 // WaveSizeFor — количество врагов в волне по уровню.
+// WaveSizeFor — размер волны 100..150 независимо от уровня.
+// base игнорируется — оставлен для совместимости сигнатуры.
 func WaveSizeFor(level, base int, rng intRng) int {
-	if base <= 0 {
-		base = 100
-	}
-	offset := 0
-	spread := 20
-	switch level {
-	case 1:
-		offset = 0
-	case 2:
-		offset = 20
-	case 3:
-		offset = 40
-	case 4:
-		offset = 60
-		spread = 40
-	case 5:
-		offset = -50
-		spread = 50
-	}
-	min := base + offset
-	if min < 20 {
-		min = 20
-	}
-	return min + rng.Intn(spread+1)
+	return 100 + rng.Intn(51)
 }
 
-// GroupCountFor — количество групп в волне по уровню.
+// GroupCountFor — количество групп в Common/Defend волне: 10..15.
 func GroupCountFor(level int, rng intRng) int {
-	switch level {
-	case 1, 2:
-		return 8 + rng.Intn(3) // 8..10
-	case 3, 4:
-		return 5 + rng.Intn(4) // 5..8
-	case 5:
-		return 1
-	}
-	return 8
+	return 10 + rng.Intn(6)
 }
 
-// enemyTiers — враги по уровням (1..4).
-var enemyTiers = map[int][]EnemyType{
-	1: {EnemyInfantry, EnemyShooter, EnemyScout, EnemyMedic},
-	2: {EnemyRammer, EnemySniper, EnemyRocketeer, EnemyBuffer},
-	3: {EnemyFleer, EnemyEngineer, EnemyFlamer, EnemyProtector},
-	4: {EnemyTank, EnemyMachineGunner, EnemySummoner, EnemyHarpooner},
+// enemyCategory — роль врага в бою.
+type enemyCategory int
+
+const (
+	CatMelee    enemyCategory = 0 // ближник
+	CatRanged   enemyCategory = 1 // дальник
+	CatObstacle enemyCategory = 2 // препятствие / быстрое и надоедливое
+	CatSupport  enemyCategory = 3 // поддержка
+)
+
+// Веса категорий внутри уровня волны: 40 / 30 / 20 / 10.
+const (
+	WeightMelee    = 40
+	WeightRanged   = 30
+	WeightObstacle = 20
+	WeightSupport  = 10
+)
+
+// enemyByLevelAndCategory — враги по уровню и роли.
+//
+//	I:   базовые
+//	II:  усиленные версии I
+//	III: специализированные (дальний бой, препятствия, неуязвимость)
+//	IV:  тяжёлые (танк, пулемётчик, огнемётчик, призыватель)
+var enemyByLevelAndCategory = map[int]map[enemyCategory][]EnemyType{
+	1: {
+		CatMelee:    {EnemyInfantry},
+		CatRanged:   {EnemyShooter},
+		CatObstacle: {EnemyScout},
+		CatSupport:  {EnemyMedic},
+	},
+	2: {
+		CatMelee:    {EnemyRammer},
+		CatRanged:   {EnemyRocketeer},
+		CatObstacle: {EnemyFleer},
+		CatSupport:  {EnemyBuffer},
+	},
+	3: {
+		CatMelee:    {EnemyHarpooner},
+		CatRanged:   {EnemySniper},
+		CatObstacle: {EnemyEngineer},
+		CatSupport:  {EnemyProtector},
+	},
+	4: {
+		CatMelee:    {EnemyTank},
+		CatRanged:   {EnemyMachineGunner},
+		CatObstacle: {EnemyFlamer},
+		CatSupport:  {EnemySummoner},
+	},
 }
 
+// tierWeights — веса уровней врагов по уровню волны.
 type tierWeights struct {
 	L1, L2, L3, L4 int
 }
 
-// waveTierWeights — веса уровней врагов для уровня волны.
 var waveTierWeights = map[int]tierWeights{
-	1: {85, 15, 0, 0},
-	2: {40, 45, 15, 0},
-	3: {5, 45, 45, 5},
-	4: {30, 30, 30, 10},
-	5: {5, 10, 45, 40},
+	1: {90, 10, 0, 0},   // I 90% / II 10%
+	2: {75, 25, 0, 0},   // I 75% / II 25%
+	3: {70, 20, 10, 0},  // I 70% / II 20% / III 10%
+	4: {50, 40, 10, 0},  // I 50% / II 40% / III 10%
+	5: {40, 40, 10, 10}, // I 40% / II 40% / III 10% / IV 10%
 }
 
 // RandomEnemyTypeForWave — случайный враг по уровню волны.
-// allowSupport = false — поддержка исключается (перебрасывается).
+//
+// Два шага:
+//  1. Выбор уровня врага (tier) по весам waveTierWeights[level].
+//  2. Выбор категории (ближник / дальник / препятствие / поддержка)
+//     по весам 40/30/20/10.
+//
+// allowSupport = false — поддержка исключается, выбор перебрасывается.
 func RandomEnemyTypeForWave(level int, allowSupport bool, rng intRng) EnemyType {
-	w, ok := waveTierWeights[level]
+	tw, ok := waveTierWeights[level]
 	if !ok {
-		w = waveTierWeights[1]
+		tw = waveTierWeights[1]
 	}
-	total := w.L1 + w.L2 + w.L3 + w.L4
+	total := tw.L1 + tw.L2 + tw.L3 + tw.L4
 	if total <= 0 {
 		return EnemyInfantry
 	}
+	catTotal := WeightMelee + WeightRanged + WeightObstacle + WeightSupport
 
-	for attempt := 0; attempt < 8; attempt++ {
+	for attempt := 0; attempt < 12; attempt++ {
+		// 1. Уровень врага.
 		roll := rng.Intn(total)
 		var tier int
 		switch {
-		case roll < w.L1:
+		case roll < tw.L1:
 			tier = 1
-		case roll < w.L1+w.L2:
+		case roll < tw.L1+tw.L2:
 			tier = 2
-		case roll < w.L1+w.L2+w.L3:
+		case roll < tw.L1+tw.L2+tw.L3:
 			tier = 3
 		default:
 			tier = 4
 		}
-		pool := enemyTiers[tier]
-		t := pool[rng.Intn(len(pool))]
-		if allowSupport || !IsSupportType(t) {
-			return t
+
+		// 2. Категория.
+		catRoll := rng.Intn(catTotal)
+		var cat enemyCategory
+		switch {
+		case catRoll < WeightMelee:
+			cat = CatMelee
+		case catRoll < WeightMelee+WeightRanged:
+			cat = CatRanged
+		case catRoll < WeightMelee+WeightRanged+WeightObstacle:
+			cat = CatObstacle
+		default:
+			cat = CatSupport
 		}
+
+		// 3. Поддержка запрещена — перебрасываем.
+		if cat == CatSupport && !allowSupport {
+			continue
+		}
+
+		cats, ok := enemyByLevelAndCategory[tier]
+		if !ok {
+			continue
+		}
+		pool := cats[cat]
+		if len(pool) == 0 {
+			continue
+		}
+		return pool[rng.Intn(len(pool))]
 	}
-	// Не смогли избежать поддержки — пехотинец.
+
+	// Fallback — пехотинец.
 	return EnemyInfantry
 }
 
@@ -282,28 +329,12 @@ func TimerTrackForLevel(level int) string {
 
 // TimerGroupIntervalFor — интервал между группами в тиках.
 func TimerGroupIntervalFor(level int) int {
-	switch level {
-	case 1, 2:
-		return 30 * 60 // 30 сек
-	case 3, 4:
-		return 25 * 60 // 25 сек
-	case 5:
-		return 20 * 60 // 20 сек
-	}
 	return 30 * 60
 }
 
 // TimerGroupSizeRangeFor — диапазон размера группы.
 func TimerGroupSizeRangeFor(level int) (int, int) {
-	switch level {
-	case 1:
-		return 20, 40
-	case 2, 3:
-		return 25, 50
-	case 4, 5:
-		return 30, 60
-	}
-	return 20, 40
+	return 10, 15
 }
 
 // DefendSpawnCountFor — сколько спавнов защищать игроку.
@@ -393,26 +424,10 @@ func AttackTrackForLevel(level int) string {
 
 // AttackGroupIntervalFor — интервал между группами в тиках.
 func AttackGroupIntervalFor(level int) int {
-	switch level {
-	case 1, 2:
-		return 30 * 60
-	case 3, 4:
-		return 25 * 60
-	case 5:
-		return 20 * 60
-	}
 	return 30 * 60
 }
 
 // AttackGroupSizeRangeFor — диапазон размера группы.
 func AttackGroupSizeRangeFor(level int) (int, int) {
-	switch level {
-	case 1:
-		return 20, 40
-	case 2, 3:
-		return 25, 50
-	case 4, 5:
-		return 30, 60
-	}
-	return 20, 40
+	return 10, 15
 }
