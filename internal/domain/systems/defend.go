@@ -34,8 +34,7 @@ func StepDefendObjectives(w *world.World) {
 	// Проигрыш.
 	if alive == 0 {
 		ws.DefendOutcome = -1
-		ws.Active = false
-		ws.PauseTimer = wavePauseTicks
+		endWave(w)
 		return
 	}
 
@@ -50,8 +49,7 @@ func StepDefendObjectives(w *world.World) {
 		}
 		if !anyAlive {
 			ws.DefendOutcome = 1
-			ws.Active = false
-			ws.PauseTimer = wavePauseTicks
+			endWave(w)
 			return
 		}
 	}
@@ -205,10 +203,8 @@ func StepAttackObjectives(w *world.World) {
 
 	if alive == 0 {
 		ws.AttackOutcome = 1
-		ws.Active = false
-		ws.PauseTimer = wavePauseTicks
+		endWave(w)
 
-		// Все враги волны погибают.
 		for i := range w.Enemies {
 			if w.Enemies[i].GroupID > 0 {
 				w.Enemies[i].HP = 0

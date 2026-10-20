@@ -7,19 +7,31 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
-const wavePauseTicks = 240
+const wavePauseTicks = 60 * 60
 
 func StepWaves(w *world.World) {
 	ws := &w.Wave
 
 	if !ws.Active {
+		// Победа — волны закончились.
 		if ws.WavesLimit > 0 && ws.Number >= ws.WavesLimit {
 			return
 		}
+
+		// Игрок нажал R — досрочный старт.
+		if w.StartWaveRequested {
+			w.StartWaveRequested = false
+			startWave(w)
+			return
+		}
+
+		// Тикаем паузу.
 		if ws.PauseTimer > 0 {
 			ws.PauseTimer--
 			return
 		}
+
+		// Пауза истекла — стартуем автоматически.
 		startWave(w)
 		return
 	}
@@ -66,8 +78,7 @@ func stepCommonWave(w *world.World) {
 	recomputeKilled(w, ws)
 
 	if ws.SpawnedCount >= ws.WaveSize || ws.GroupsRemaining <= 0 {
-		ws.Active = false
-		ws.PauseTimer = wavePauseTicks
+		endWave(w)
 		return
 	}
 
@@ -86,8 +97,7 @@ func stepTimerWave(w *world.World) {
 				w.Enemies[i].HP = 0
 			}
 		}
-		ws.Active = false
-		ws.PauseTimer = wavePauseTicks
+		endWave(w)
 		return
 	}
 
@@ -725,4 +735,26 @@ func spawnAttackGroup(w *world.World) {
 
 	ws.GroupOriginX = src.X + (w.Rng.Float64()*2-1)*60
 	ws.GroupOriginY = src.Y + (w.Rng.Float64()*2-1)*60
+}
+
+// endWave завершает текущую волну, лечит игрока и ставит паузу
+// на 60 секунд до следующей.
+func endWave(w *world.World) {
+	ws := &w.Wave
+	ws.Active = false
+	ws.PauseTimer = wavePauseTicks
+
+	// Проигрыш в Defend — игрок умирает, лечить не нужно.
+	if ws.DefendOutcome == -1 {
+		return
+	}
+
+	// Отхил до 100% и сброс статусов.
+	w.Player.Damage = 0
+	w.Player.BurnTimer = 0
+	w.Player.BurnTick = 0
+	w.Player.Harpooned = false
+	w.Player.HarpoonID = -1
+	w.Player.Held = false
+	w.Player.HeldBy = -1
 }

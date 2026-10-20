@@ -167,6 +167,11 @@ func (g *Game) Update() error {
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
 	systems.StepWaves(g.world)
+	// R — досрочно начать волну (только во время паузы, при закрытом меню).
+	if !g.menu.Open && inpututil.IsKeyJustPressed(ebiten.KeyR) && !g.world.Wave.Active {
+		g.world.StartWaveRequested = true
+	}
+
 	if g.world.PendingTrack != "" {
 		if g.music != nil {
 			if err := g.music.PlayLoopForce(g.world.PendingTrack); err != nil {

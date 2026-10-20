@@ -9,23 +9,24 @@ import (
 )
 
 type World struct {
-	Player           Player
-	Enemies          []Enemy
-	Bullets          []Bullet
-	Rockets          []Rocket
-	Explosions       []Explosion
-	EnemyProjectiles []EnemyProjectile
-	EnemyRockets     []EnemyRocket
-	Harpoons         []Harpoon
-	Turrets          []Turret
-	Walls            []geometry.Rect
-	SpawnPoints      []SpawnPoint
-	SpawnZone        geometry.Rect
-	Rng              *rand.Rand
-	NavGrid          *geometry.Grid
-	EnemyOccupancy   []bool
-	SpatialHash      *SpatialHash
-	Wave             WaveState
+	Player             Player
+	Enemies            []Enemy
+	Bullets            []Bullet
+	Rockets            []Rocket
+	Explosions         []Explosion
+	EnemyProjectiles   []EnemyProjectile
+	EnemyRockets       []EnemyRocket
+	Harpoons           []Harpoon
+	Turrets            []Turret
+	Walls              []geometry.Rect
+	SpawnPoints        []SpawnPoint
+	SpawnZone          geometry.Rect
+	Rng                *rand.Rand
+	NavGrid            *geometry.Grid
+	EnemyOccupancy     []bool
+	SpatialHash        *SpatialHash
+	Wave               WaveState
+	StartWaveRequested bool
 
 	// Уникальные ID.
 	NextEnemyUID   int

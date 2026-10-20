@@ -178,6 +178,7 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if !ws.Active && ws.PauseTimer > 0 && !ws.IsVictory() {
 		sec := ws.PauseTimer / 60
 
+		// Результат предыдущей волны.
 		switch {
 		case ws.DefendOutcome == 1:
 			r.DrawScreenText("DEFEND SUCCESS", panelX+12, y, ColorMenuSelected)
@@ -189,11 +190,16 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 			r.DrawScreenText("ATTACK SUCCESS", panelX+12, y,
 				color.NRGBA{R: 220, G: 100, B: 120, A: 255})
 			y += rowH
-		default:
-			r.DrawScreenText(fmt.Sprintf("Next wave in %ds", sec),
-				panelX+12, y, ColorMenuText)
-			y += rowH
 		}
+
+		// Отсчёт до следующей волны.
+		r.DrawScreenText(fmt.Sprintf("Next wave in %ds", sec),
+			panelX+12, y, ColorMenuText)
+		y += rowH
+
+		// Подсказка про R.
+		r.DrawScreenText("Press R to start", panelX+12, y, ColorMenuSelected)
+		y += rowH
 	}
 
 	// Состав волны.
