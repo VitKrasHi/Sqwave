@@ -3,6 +3,7 @@ package systems
 import (
 	"math"
 	"math/rand"
+	"sort"
 
 	"Sqwave/internal/domain/geometry"
 	"Sqwave/internal/domain/input"
@@ -86,7 +87,11 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 		if chargeRatio > 1 {
 			chargeRatio = 1
 		}
-		fireRay(w, cx, cy, baseAngle, chargeRatio)
+		if weapon.MaxPierce > 1 {
+			fireSniperPierce(w, cx, cy, baseAngle, chargeRatio)
+		} else {
+			fireRay(w, cx, cy, baseAngle, chargeRatio)
+		}
 
 		p.AimCharge = 0
 		p.FireCooldownTimer = weapon.FireCooldown
@@ -339,6 +344,20 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 		} else {
 			dmg := p.Weapon.DamageAt(0, 1)
 			e.TakeDamage(dmg)
+
+			// Оглушение мечом — работает на всех врагов.
+			if weapon.StunOnHit > 0 {
+				if e.StunTimer < weapon.StunOnHit {
+					e.StunTimer = weapon.StunOnHit
+				}
+			}
+
+			// i-frames после попадания мечом.
+			if weapon.StunOnHit > 0 {
+				if p.MeleeIFrames < world.MeleeHitIFrames {
+					p.MeleeIFrames = world.MeleeHitIFrames
+				}
+			}
 		}
 	}
 
@@ -398,4 +417,143 @@ func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
 	}
 	half := spreadDeg * math.Pi / 360
 	return (rng.Float64()*2 - 1) * half
+}
+
+// fireSniperPierce — выстрел снайперки, пробивающий несколько врагов.
+// Количество пробитых = 1 + AimChargeRatio * (MaxPierce - 1).
+// Каждый следующий враг получает меньше урона (-PierceDamageFalloff от базы).
+func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
+	weapon := w.Player.Weapon.Stats()
+	cos := math.Cos(angle)
+	sin := math.Sin(angle)
+
+	startX := cx + cos*world.PlayerSize/2
+	startY := cy + sin*world.PlayerSize/2
+	maxEndX := cx + cos*weapon.Range
+	maxEndY := cy + sin*weapon.Range
+
+	// Ближайшая стена.
+	wallT := 1.0
+	for _, wall := range w.Walls {
+		if t, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, wall); ok {
+			if t < wallT {
+				wallT = t
+			}
+		}
+	}
+
+	// Препятствия, которые блокируют прошив (спавны, турели).
+	obstacleT := wallT
+	var hitSpawn *world.SpawnPoint
+	for i := range w.SpawnPoints {
+		sp := &w.SpawnPoints[i]
+		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		if t, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, sp.Rect()); ok {
+			if t < obstacleT {
+				obstacleT = t
+				hitSpawn = sp
+			}
+		}
+	}
+	for i := range w.Turrets {
+		t := &w.Turrets[i]
+		if t.IsDead() {
+			continue
+		}
+		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, t.Rect()); ok {
+			if tt < obstacleT {
+				obstacleT = tt
+				hitSpawn = nil // турель блокирует, спавн за ней не достать
+			}
+		}
+	}
+
+	// Собираем всех врагов на луче до препятствия.
+	type hitTarget struct {
+		e *world.Enemy
+		t float64
+	}
+	var hits []hitTarget
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() {
+			continue
+		}
+		if t, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, e.Rect()); ok {
+			if t < obstacleT {
+				hits = append(hits, hitTarget{e, t})
+			}
+		}
+	}
+
+	sort.Slice(hits, func(i, j int) bool { return hits[i].t < hits[j].t })
+
+	// Сколько врагов пробьёт выстрел.
+	pierceCount := 1
+	if weapon.MaxPierce > 1 {
+		pierceCount = 1 + int(chargeRatio*float64(weapon.MaxPierce-1))
+		if pierceCount > weapon.MaxPierce {
+			pierceCount = weapon.MaxPierce
+		}
+		if pierceCount < 1 {
+			pierceCount = 1
+		}
+	}
+
+	// Наносим урон по цепочке.
+	endT := wallT
+	pierced := 0
+	for i := 0; i < len(hits) && pierced < pierceCount; i++ {
+		h := hits[i]
+
+		falloff := 1.0 - weapon.PierceDamageFalloff*float64(pierced)
+		if falloff < 0.15 {
+			falloff = 0.15
+		}
+
+		if !h.e.Invulnerable && !BlocksDamageFrom(h.e, startX, startY) {
+			distance := h.t * weapon.Range
+			baseDmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			dmg := int(float64(baseDmg) * falloff)
+			if dmg < 1 {
+				dmg = 1
+			}
+			h.e.TakeDamage(dmg)
+		}
+
+		endT = h.t
+		pierced++
+	}
+
+	// Если прошив не исчерпан и есть вражеский спавн — бьём его.
+	if pierced < pierceCount && hitSpawn != nil {
+		distance := obstacleT * weapon.Range
+		baseDmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+		falloff := 1.0 - weapon.PierceDamageFalloff*float64(pierced)
+		if falloff < 0.15 {
+			falloff = 0.15
+		}
+		dmg := int(float64(baseDmg) * falloff)
+		if dmg < 1 {
+			dmg = 1
+		}
+		hitSpawn.Damage(dmg)
+		endT = obstacleT
+	}
+
+	endX := startX + (maxEndX-startX)*endT
+	endY := startY + (maxEndY-startY)*endT
+
+	// Визуальный след.
+	w.Bullets = append(w.Bullets, world.Bullet{
+		StartX:  startX,
+		StartY:  startY,
+		EndX:    endX,
+		EndY:    endY,
+		Life:    weapon.VisualLife,
+		MaxLife: weapon.VisualLife,
+		Weapon:  w.Player.Weapon,
+	})
 }

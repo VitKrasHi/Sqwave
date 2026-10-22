@@ -65,6 +65,18 @@ type WeaponStats struct {
 	ExplosionDamage int // взрыв по площади
 
 	KnockbackForce float64 // для щита — сила отбрасывания
+
+	// StunOnHit — оглушение при попадании melee-атакой (в тиках).
+	// 0 = нет оглушения (щит).
+	StunOnHit int
+
+	// MaxPierce — сколько врагов пробивает выстрел на полном заряде.
+	// 0 или 1 = обычный hitscan без прошива.
+	MaxPierce int
+
+	// PierceDamageFalloff — потеря урона с каждым следующим пробитым врагом.
+	// 0.2 = -20% урона за каждого.
+	PierceDamageFalloff float64
 }
 
 var weapons = map[WeaponType]WeaponStats{
@@ -90,7 +102,7 @@ var weapons = map[WeaponType]WeaponStats{
 	},
 	WeaponSniper: {
 		Name: "Sniper", FireCooldown: 60, Range: 3000,
-		Spread: 0, Pellets: 1, VisualLife: 12, ChargeTime: 45,
+		Spread: 0, Pellets: 1, VisualLife: 12, ChargeTime: 45, MaxPierce: 5, PierceDamageFalloff: 0.2,
 		HPBonus: 20, SpeedBonus: 40,
 		DamageKind:      DamageChargeScaled,
 		DamageMinCharge: 50, DamageMaxCharge: 200,
@@ -113,7 +125,7 @@ var weapons = map[WeaponType]WeaponStats{
 		Name: "Sword", FireCooldown: 24,
 		MeleeRange: 82, MeleeArc: 150, SwingDuration: 12, BladeWidth: 5,
 		HPBonus: 100, SpeedBonus: 50,
-		DamageKind: DamageFixed, Damage: 50,
+		DamageKind: DamageFixed, Damage: 50, StunOnHit: 30,
 	},
 	WeaponShield: {
 		Name: "Shield", FireCooldown: 30,

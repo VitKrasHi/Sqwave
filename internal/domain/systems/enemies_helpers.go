@@ -310,19 +310,43 @@ func gridWithAgents(base *geometry.Grid, enemies []world.Enemy, skip *world.Enem
 // удар в конусе 75° от направления рывка.
 // Рывок имеет фиксированную длительность (LungeDur = 12 тиков),
 // скорость подбирается под дистанцию.
+// processMeleeAttack — замах (стоит, фиксирует точку) → рывок к точке →
+// удар. Попадание проверяется как отрезок МЕЧА против хитбокса игрока,
+// плюс страховочная проверка конуса в конце.
 func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) bool {
 	pcx, pcy := w.Player.Center()
+	p := &w.Player
 
-	// Половина конуса удара (75° полный угол → 37.5° в каждую сторону).
-	const halfConeDeg = 75.0 / 2.0
-	cosHalfCone := math.Cos(halfConeDeg * math.Pi / 180)
-
-	// Фиксированная длительность рывка.
 	const lungeDur = 12
+	const lungeOvershoot = 60.0
+	const hitTolerance = 3.0
 
-	// checkHit — проверяет, попадает ли игрок в конус удара
-	// с вершиной в точке SwingTarget и направлением dirX/dirY.
-	checkHit := func(originX, originY, dirX, dirY float64) bool {
+	playerHitBox := geometry.Rect{
+		X: p.X - hitTolerance,
+		Y: p.Y - hitTolerance,
+		W: world.PlayerSize + 2*hitTolerance,
+		H: world.PlayerSize + 2*hitTolerance,
+	}
+
+	// meleeHitByBlade — проверка попадания мечом-отрезком.
+	// origin — центр врага, dir — направление меча, length — длина.
+	meleeHitByBlade := func(originX, originY, dirX, dirY, length float64) bool {
+		if p.IsDead() {
+			return false
+		}
+		if length < 1 {
+			return false
+		}
+		endX := originX + dirX*length
+		endY := originY + dirY*length
+		_, ok := geometry.RaySegmentIntersectsRect(originX, originY, endX, endY, playerHitBox)
+		return ok
+	}
+
+	// checkConeHit — проверка конуса от фиксированной точки (для страховки).
+	halfConeDeg := 75.0 / 2.0
+	cosHalfCone := math.Cos(halfConeDeg * math.Pi / 180)
+	checkConeHit := func(originX, originY, dirX, dirY float64) bool {
 		d := math.Hypot(pcx-originX, pcy-originY)
 		if d > stats.MeleeRange {
 			return false
@@ -336,6 +360,12 @@ func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) 
 		return dot >= cosHalfCone
 	}
 
+	dealDamage := func() {
+		dmg := int(float64(stats.Damage) * e.DamageMul())
+		TryMeleeDamage(w, e, dmg)
+		e.LungeHit = true
+	}
+
 	// --- Фаза рывка ---
 	if e.LungeActive {
 		e.LungeTimer++
@@ -345,26 +375,39 @@ func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) 
 		e.FacingX = e.LungeDirX
 		e.FacingY = e.LungeDirY
 
-		// Удар — только в последний тик рывка.
+		// Проверка мечом — отрезок от центра врага в направлении рывка.
+		if !e.LungeHit {
+			ecx, ecy := e.Center()
+			if meleeHitByBlade(ecx, ecy, e.LungeDirX, e.LungeDirY, stats.MeleeRange) {
+				dealDamage()
+			}
+		}
+
+		// Также проверка AABB тела — если меч задел вплотную.
+		if !e.LungeHit && e.Rect().Intersects(playerHitBox) {
+			dealDamage()
+		}
+
 		if e.LungeTimer >= e.LungeDur {
-			if checkHit(e.SwingTargetX, e.SwingTargetY, e.LungeDirX, e.LungeDirY) {
-				dmg := int(float64(stats.Damage) * e.DamageMul())
-				TryMeleeDamage(w, e, dmg)
+			// Страховка: конус от SwingTarget.
+			if !e.LungeHit && checkConeHit(
+				e.SwingTargetX, e.SwingTargetY, e.LungeDirX, e.LungeDirY) {
+				dealDamage()
 			}
 
 			e.LungeActive = false
 			e.LungeTimer = 0
+			e.LungeHit = false // сброс для следующей атаки
 			span := stats.AttackCooldownMax - stats.AttackCooldownMin
 			e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
 		}
 		return true
 	}
 
-	// --- Фаза замаха: враг стоит на месте ---
+	// --- Фаза замаха ---
 	if e.SwingActive {
 		e.SwingTimer++
 
-		// Стоим, только поворачиваемся к игроку для визуала.
 		ecx, ecy := e.Center()
 		dx := pcx - ecx
 		dy := pcy - ecy
@@ -374,45 +417,73 @@ func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) 
 			e.FacingY = dy / l
 		}
 
+		// Визуальная длина меча и угол — те же, что в drawEnemySwing.
+		progress := 0.0
+		if stats.SwingDuration > 0 {
+			progress = float64(e.SwingTimer) / float64(stats.SwingDuration)
+		}
+
+		var bladeAngle, bladeLen float64
+		if progress < 0.6 {
+			t := progress / 0.6
+			bladeAngle = math.Atan2(e.FacingY, e.FacingX) - t*1.4
+			bladeLen = stats.MeleeRange * (0.5 + 0.5*t)
+		} else {
+			bladeAngle = math.Atan2(e.FacingY, e.FacingX) - 1.4
+			bladeLen = stats.MeleeRange
+		}
+
+		// Проверка мечом по той же длине/углу, что рисуется.
+		if !e.LungeHit {
+			if meleeHitByBlade(ecx, ecy, math.Cos(bladeAngle), math.Sin(bladeAngle), bladeLen) {
+				dealDamage()
+			}
+		}
+
 		if e.SwingTimer >= stats.SwingDuration {
 			e.SwingActive = false
 			e.SwingTimer = 0
 
-			// Рывок к зафиксированной точке.
+			// Если уже попали во время замаха — кулдаун.
+			if e.LungeHit {
+				e.LungeHit = false
+				span := stats.AttackCooldownMax - stats.AttackCooldownMin
+				e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
+				return true
+			}
+
 			ecx, ecy = e.Center()
 			dx = e.SwingTargetX - ecx
 			dy = e.SwingTargetY - ecy
 			l = math.Hypot(dx, dy)
 
 			if l < 2 {
-				// Уже в точке — мгновенный удар.
-				dirX := e.FacingX
-				dirY := e.FacingY
-				if dirX == 0 && dirY == 0 {
-					dirX, dirY = 1, 0
+				// Мгновенный удар.
+				if e.Rect().Intersects(playerHitBox) {
+					dealDamage()
+				} else if checkConeHit(e.SwingTargetX, e.SwingTargetY, e.FacingX, e.FacingY) {
+					dealDamage()
 				}
-				if checkHit(e.SwingTargetX, e.SwingTargetY, dirX, dirY) {
-					dmg := int(float64(stats.Damage) * e.DamageMul())
-					TryMeleeDamage(w, e, dmg)
-				}
+				e.LungeHit = false
 				span := stats.AttackCooldownMax - stats.AttackCooldownMin
 				e.AttackTimer = stats.AttackCooldownMin + w.Rng.Intn(span+1)
 				return true
 			}
 
-			// Фиксированная длительность рывка, скорость под дистанцию.
+			flyLen := l + lungeOvershoot
 			e.LungeActive = true
 			e.LungeTimer = 0
-			e.LungeDur = lungeDur
+			e.LungeHit = false
 			e.LungeDirX = dx / l
 			e.LungeDirY = dy / l
-			e.LungeSpeed = l / float64(e.LungeDur)
-			if e.LungeSpeed > 20 {
-				e.LungeSpeed = 20
+			e.LungeSpeed = flyLen / float64(lungeDur)
+			if e.LungeSpeed > 22 {
+				e.LungeSpeed = 22
 			}
-			if e.LungeSpeed < 3 {
-				e.LungeSpeed = 3
+			if e.LungeSpeed < 5 {
+				e.LungeSpeed = 5
 			}
+			e.LungeDur = lungeDur
 		}
 		return true
 	}

@@ -166,7 +166,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		MeleeTriggerRange: 140,
 		AttackCooldownMin: 24, // 400 мс
 		AttackCooldownMax: 60, // 1 сек
-		SwingDuration:     7,
+		SwingDuration:     8,
 	},
 	EnemyShooter: {
 		Name:              "Shooter",
@@ -187,7 +187,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		Name:              "Scout",
 		MaxHP:             70,
 		SP:                200,
-		Damage:            5, // на пеллету, 8 пеллет — до 80 в упор
+		Damage:            4, // на пеллету, 8 пеллет — до 80 в упор
 		Size:              20,
 		MeleeRange:        60, // дистанция выстрела дробью
 		AttackCooldownMin: 50,
@@ -195,7 +195,7 @@ var enemyStats = map[EnemyType]EnemyStats{
 		ProjectileSpeed:   9,
 		ProjectileSize:    4,
 		ProjectileLife:    20, // короткая жизнь — дробь летит недалеко
-		ProjectileCount:   8,
+		ProjectileCount:   5,
 		ProjectileSpread:  30,
 	},
 	EnemyMedic: {

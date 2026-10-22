@@ -11,6 +11,9 @@ const (
 	PlayerSize    = 24.0
 	SpawnZoneSize = 320.0
 
+	// i-frames после попадания мечом.
+	MeleeHitIFrames = 20 // 0.33 сек при 60 TPS
+
 	// Формула скорости: base + SP * coef.
 	PlayerBaseSpeed = 2.0
 	SpeedPerSP      = 0.05

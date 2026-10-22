@@ -421,6 +421,10 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawText(formatLoadout(&w.Player), 8, 24)
 		if p.IsAiming() {
 			r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
+			pierce := p.PierceCount()
+			if pierce > 1 {
+				r.DrawText(fmt.Sprintf("Pierce: %d", pierce), 8, 56)
+			}
 		}
 		if w.PlayerInSpawnZone() && !g.menu.Open {
 			r.DrawScreenText("[E] choose weapon", 8, 60, ColorSpawnZone)

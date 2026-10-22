@@ -32,6 +32,9 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	if p.ParryCooldown > 0 {
 		p.ParryCooldown--
 	}
+	if p.MeleeIFrames > 0 {
+		p.MeleeIFrames--
+	}
 
 	// --- Захват/гарпун ---
 	if p.Held {

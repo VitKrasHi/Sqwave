@@ -68,6 +68,9 @@ type Player struct {
 	// Парирование (Space).
 	ParryWindow   int
 	ParryCooldown int
+
+	// i-frames после попадания мечом.
+	MeleeIFrames int
 }
 
 func (p *Player) Rect() geometry.Rect {
@@ -120,8 +123,8 @@ func (p *Player) SwingProgress() float64 {
 }
 
 func (p *Player) TakeDamage(n int) {
-	if p.DashActive {
-		return // неуязвим во время рывка
+	if p.DashActive || p.MeleeIFrames > 0 {
+		return
 	}
 	if n <= 0 {
 		return
@@ -235,4 +238,26 @@ func (p *Player) ApplyBurn(ticks int) {
 
 func (p *Player) IsBurning() bool {
 	return p.BurnTimer > 0
+}
+
+func (p *Player) IsInvulnerable() bool {
+	return p.DashActive || p.MeleeIFrames > 0
+}
+
+// PierceCount — сколько врагов пробьёт следующий выстрел снайперки.
+// 1 для всего, кроме снайперки в заряде.
+func (p *Player) PierceCount() int {
+	w := p.Weapon.Stats()
+	if w.MaxPierce <= 1 || !p.IsAiming() {
+		return 1
+	}
+	ratio := p.AimChargeRatio()
+	n := 1 + int(ratio*float64(w.MaxPierce-1))
+	if n > w.MaxPierce {
+		n = w.MaxPierce
+	}
+	if n < 1 {
+		n = 1
+	}
+	return n
 }
