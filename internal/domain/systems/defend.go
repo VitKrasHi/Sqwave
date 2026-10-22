@@ -267,3 +267,21 @@ func pickEnemySpawnLocation(w *world.World, pcx, pcy float64) (float64, float64,
 	}
 	return 0, 0, false
 }
+
+// spawnIsProtected — true, если у спавна ещё живы защитники.
+// Пока защитники живы, спавн нельзя повредить.
+func SpawnIsProtected(w *world.World, sp *world.SpawnPoint) bool {
+	if sp.Faction != world.SpawnFactionEnemy {
+		return false
+	}
+	for i := range w.Enemies {
+		e := &w.Enemies[i]
+		if e.IsDead() {
+			continue
+		}
+		if e.OwnerSpawnIdx == sp.Index {
+			return true
+		}
+	}
+	return false
+}

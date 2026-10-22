@@ -93,6 +93,8 @@ type WaveState struct {
 	AttackSpawnCount  int
 	AttackSpawnsAlive int
 	AttackOutcome     int // 0=в процессе, 1=победа (все спавны убиты)
+	// индекс спавна, из которого спавнится текущая группа.
+	AttackGroupOwnerSpawnIdx int
 }
 
 func (ws *WaveState) IsVictory() bool {

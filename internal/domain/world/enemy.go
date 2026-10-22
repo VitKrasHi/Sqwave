@@ -616,21 +616,24 @@ type Enemy struct {
 	TargetSpawnIdx int
 	// Defend: изначальное намерение — атаковать спавн.
 	OriginalTargetSpawn int // -1 = на игрока, >= 0 = на спавн
+	// OwnerSpawnIdx — индекс спавна, который создал этого врага.
+	// Используется только в Attack-волнах. -1 = не привязан.
+	OwnerSpawnIdx int
 }
 
 func NewEnemy(t EnemyType, x, y float64) Enemy {
 	hp := t.Stats().MaxHP
 	return Enemy{
-		Type:                t,
-		X:                   x,
-		Y:                   y,
-		LastX:               x,
-		LastY:               y,
-		HP:                  hp,
-		LastHP:              hp,
-		HealTargetIdx:       -1,
-		TargetSpawnIdx:      -1,
-		OriginalTargetSpawn: -1,
+		Type:           t,
+		X:              x,
+		Y:              y,
+		LastX:          x,
+		LastY:          y,
+		HP:             hp,
+		LastHP:         hp,
+		HealTargetIdx:  -1,
+		TargetSpawnIdx: -1,
+		OwnerSpawnIdx:  -1,
 	}
 }
 

@@ -310,7 +310,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		drawNavDebug(r, w)
 	}
 
-	drawSpawns(r, w)
+	drawSpawns(r, w, g.ticks)
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
 	drawBufferBeams(r, w)
@@ -1201,7 +1201,7 @@ func drawProtectorBeams(r SceneRenderer, w *world.World) {
 	}
 }
 
-func drawSpawns(r SceneRenderer, w *world.World) {
+func drawSpawns(r SceneRenderer, w *world.World, ticks int) {
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
 
@@ -1226,8 +1226,22 @@ func drawSpawns(r SceneRenderer, w *world.World) {
 			c = color.NRGBA{R: 60, G: 200, B: 100, A: 200}
 			cInner = color.NRGBA{R: 100, G: 240, B: 140, A: 220}
 		} else {
-			c = color.NRGBA{R: 200, G: 60, B: 80, A: 200}
-			cInner = color.NRGBA{R: 255, G: 100, B: 120, A: 220}
+			protected := systems.SpawnIsProtected(w, sp)
+			if protected {
+				// Защищён — синий щит.
+				c = color.NRGBA{R: 80, G: 90, B: 140, A: 220}
+				cInner = color.NRGBA{R: 120, G: 140, B: 200, A: 220}
+
+				// Пульсирующее кольцо щита.
+				pulse := 0.85 + 0.15*math.Sin(float64(ticks)*0.2)
+				shieldRad := sp.Size/2 + 10*pulse
+				shield := color.NRGBA{R: 100, G: 180, B: 255, A: 140}
+				r.DrawCircle(sp.X, sp.Y, shieldRad, shield)
+			} else {
+				// Открыт — можно бить. Пульсирующий красный.
+				c = color.NRGBA{R: 200, G: 60, B: 80, A: 220}
+				cInner = color.NRGBA{R: 255, G: 100, B: 120, A: 220}
+			}
 		}
 
 		r.DrawCircle(sp.X, sp.Y, rad, c)

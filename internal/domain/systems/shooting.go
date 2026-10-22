@@ -263,9 +263,12 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 			}
 		}
 	} else if hitSpawn != nil {
-		distance := enemyT * weapon.Range
-		dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
-		hitSpawn.Damage(dmg)
+		if !SpawnIsProtected(w, hitSpawn) {
+			distance := enemyT * weapon.Range
+			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			hitSpawn.Damage(dmg)
+		}
+		// Если защищён — луч упирается в щит, урона нет.
 	}
 
 	// Визуальный след выстрела.
@@ -377,11 +380,13 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 		}
 	}
 
-	// Вражеские спавны.
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
 		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
 			continue
+		}
+		if SpawnIsProtected(w, sp) {
+			continue // защищён — урона нет
 		}
 		if _, ok := geometry.RaySegmentIntersectsRect(cx, cy, endX, endY, sp.Rect()); ok {
 			dmg := p.Weapon.DamageAt(0, 1)
@@ -453,6 +458,7 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
 		if t, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, sp.Rect()); ok {
 			if t < obstacleT {
 				obstacleT = t
+				// Защищённый спавн — тоже препятствие.
 				hitSpawn = sp
 			}
 		}
@@ -528,7 +534,7 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
 	}
 
 	// Если прошив не исчерпан и есть вражеский спавн — бьём его.
-	if pierced < pierceCount && hitSpawn != nil {
+	if pierced < pierceCount && hitSpawn != nil && !SpawnIsProtected(w, hitSpawn) {
 		distance := obstacleT * weapon.Range
 		baseDmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
 		falloff := 1.0 - weapon.PierceDamageFalloff*float64(pierced)
@@ -540,6 +546,9 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
 			dmg = 1
 		}
 		hitSpawn.Damage(dmg)
+		endT = obstacleT
+	} else if hitSpawn != nil {
+		// Щит блокирует луч, но урон не идёт.
 		endT = obstacleT
 	}
 

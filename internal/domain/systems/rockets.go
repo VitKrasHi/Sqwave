@@ -90,7 +90,7 @@ func StepRockets(w *world.World) {
 		}
 
 		// Прямое попадание в спавн.
-		if hitSpawn != nil {
+		if hitSpawn != nil && !SpawnIsProtected(w, hitSpawn) {
 			hitSpawn.Damage(weapon.DirectHitDamage)
 		}
 
@@ -143,6 +143,9 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
 		if sp.IsDead() || sp.Faction != world.SpawnFactionEnemy {
+			continue
+		}
+		if SpawnIsProtected(w, sp) {
 			continue
 		}
 		scx, scy := sp.Center()

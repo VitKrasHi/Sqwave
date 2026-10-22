@@ -156,6 +156,12 @@ func spawnOneTimerGroupMember(w *world.World) {
 	e.GroupID = ws.GroupID
 	e.OriginalTargetSpawn = -1
 	e.TargetSpawnIdx = -1
+
+	// Attack-волна: привязка к спавну, чтобы защита работала.
+	if ws.Kind == world.WaveKindAttack {
+		e.OwnerSpawnIdx = ws.AttackGroupOwnerSpawnIdx
+	}
+
 	w.Enemies = append(w.Enemies, e)
 
 	if world.IsSupportType(t) {
@@ -732,6 +738,7 @@ func spawnAttackGroup(w *world.World) {
 	ws.GroupRemaining = size
 	ws.GroupSpawnTimer = 0
 	ws.GroupSupports = 0
+	ws.AttackGroupOwnerSpawnIdx = src.Index // ← запоминаем, чей это спавн
 
 	ws.GroupOriginX = src.X + (w.Rng.Float64()*2-1)*60
 	ws.GroupOriginY = src.Y + (w.Rng.Float64()*2-1)*60
