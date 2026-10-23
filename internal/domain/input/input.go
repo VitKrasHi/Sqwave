@@ -9,6 +9,8 @@ type PlayerInput struct {
 	Interact              bool
 	MenuUp                bool // стрелка вверх / W
 	MenuDown              bool // стрелка вниз / S
+	MenuLeft              bool
+	MenuRight             bool
 	MenuConfirm           bool // Enter / Space
 	AimX, AimY            float64
 	DashChargeHeld        bool

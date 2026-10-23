@@ -188,6 +188,7 @@ func (g *Game) Update() error {
 	systems.StepTurrets(g.world)
 	systems.StepBurning(g.world)
 	systems.StepHarpoons(g.world)
+	systems.StepCoins(g.world)
 
 	cx, cy := g.world.Player.Center()
 	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
@@ -310,6 +311,8 @@ func (g *Game) Draw(r SceneRenderer) {
 		drawNavDebug(r, w)
 	}
 
+	drawCoins(r, w, g.ticks)
+
 	drawSpawns(r, w, g.ticks)
 	drawMedicBeams(r, w)
 	drawSniperBeams(r, w)
@@ -431,6 +434,7 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 
 		drawHPBar(r, p.CurrentHP(), p.MaxHP())
+		drawCoinCounter(r, p)
 		drawWavePanel(r, w)
 
 		// Индикатор установки турели.
@@ -1311,5 +1315,17 @@ func drawPauseMenu(r SceneRenderer, selected int) {
 		r.DrawScreenRect(btnX-2, y-2, btnW+4, btnH+4, borderBtn)
 		r.DrawScreenRect(btnX, y, btnW, btnH, bgBtn)
 		r.DrawScreenTextScaled(label, btnX+20, y+10, 1.8, textBtn)
+	}
+}
+
+func drawCoins(r SceneRenderer, w *world.World, ticks int) {
+	for _, c := range w.Coins {
+		pulse := 0.8 + 0.2*math.Sin(float64(ticks)*0.15)
+		rad := world.CoinSize * 0.6 * pulse
+		// Внешнее кольцо.
+		r.DrawCircle(c.X, c.Y, rad*1.4, color.NRGBA{R: 200, G: 160, B: 40, A: 100})
+		// Тело монеты.
+		r.DrawCircle(c.X, c.Y, rad, color.NRGBA{R: 255, G: 210, B: 60, A: 255})
+		r.DrawCircle(c.X, c.Y, rad*0.6, color.NRGBA{R: 255, G: 240, B: 140, A: 255})
 	}
 }

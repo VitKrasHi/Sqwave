@@ -20,6 +20,7 @@ type World struct {
 	Turrets            []Turret
 	Walls              []geometry.Rect
 	SpawnPoints        []SpawnPoint
+	Coins              []Coin
 	SpawnZone          geometry.Rect
 	Rng                *rand.Rand
 	NavGrid            *geometry.Grid

@@ -72,4 +72,7 @@ const (
 	MedicFollowSpeedFactor = 1.05
 	MedicAllyRadius        = 900.0 // было 320 — теперь видит почти всю карту
 	MedicPlayerFleeRange   = 140.0
+
+	// Цена полного отхила в меню спавна.
+	FullHPPrice = 5
 )

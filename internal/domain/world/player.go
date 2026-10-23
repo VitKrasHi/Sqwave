@@ -71,6 +71,9 @@ type Player struct {
 
 	// i-frames после попадания мечом.
 	MeleeIFrames int
+
+	// Монеты, выпавшие из врагов.
+	Coins int
 }
 
 func (p *Player) Rect() geometry.Rect {

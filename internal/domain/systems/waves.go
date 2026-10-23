@@ -751,17 +751,9 @@ func endWave(w *world.World) {
 	ws.Active = false
 	ws.PauseTimer = wavePauseTicks
 
-	// Проигрыш в Defend — игрок умирает, лечить не нужно.
-	if ws.DefendOutcome == -1 {
-		return
-	}
-
-	// Отхил до 100% и сброс статусов.
-	w.Player.Damage = 0
+	// Сбрасываем только эффекты, HP не трогаем.
 	w.Player.BurnTimer = 0
 	w.Player.BurnTick = 0
 	w.Player.Harpooned = false
 	w.Player.HarpoonID = -1
-	w.Player.Held = false
-	w.Player.HeldBy = -1
 }

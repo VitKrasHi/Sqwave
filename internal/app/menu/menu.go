@@ -54,7 +54,10 @@ func (m *Menu) buildButtons() {
 	m.buttons = []*Button{
 		{Label: "Create game", X: btnX, Y: btnY, W: btnW, H: btnH, Action: m.onStart},
 		{Label: "Settings", X: btnX, Y: btnY + btnH + gap, W: btnW, H: btnH,
-			Action: func() { m.settings.Open = true; m.settings.Selected = settings.SelVolume }},
+			Action: func() {
+				m.settings.Open = true
+				m.settings.Selected = settings.SelVolume
+			}},
 		{Label: "Exit", X: btnX, Y: btnY + (btnH+gap)*2, W: btnW, H: btnH, Action: m.onExit},
 	}
 }
@@ -67,7 +70,6 @@ func (m *Menu) Update() error {
 	particles.Update(m.ps, panelW+20, float64(world.ScreenWidth)-20,
 		20, float64(world.ScreenHeight)-20)
 
-	// Если открыты настройки — обрабатываем только их.
 	if m.settings.Open {
 		if m.settings.Update() {
 			m.settings.Open = false
@@ -126,6 +128,5 @@ func (m *Menu) Draw(r game.SceneRenderer) {
 	r.DrawScreenText("F11 fullscreen",
 		60, sh-40, color.NRGBA{R: 90, G: 110, B: 140, A: 255})
 
-	// Settings panel — поверх всего.
 	m.settings.Draw(r)
 }

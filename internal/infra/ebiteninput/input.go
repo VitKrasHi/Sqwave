@@ -25,6 +25,8 @@ func (s *Source) Poll() input.PlayerInput {
 		SwapWeapon:     inpututil.IsKeyJustPressed(ebiten.KeyQ),
 		MenuUp:         inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) || inpututil.IsKeyJustPressed(ebiten.KeyW),
 		MenuDown:       inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) || inpututil.IsKeyJustPressed(ebiten.KeyS),
+		MenuLeft:       inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) || inpututil.IsKeyJustPressed(ebiten.KeyA),
+		MenuRight:      inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) || inpututil.IsKeyJustPressed(ebiten.KeyD),
 		MenuConfirm:    inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace),
 		AimX:           float64(mx),
 		AimY:           float64(my),

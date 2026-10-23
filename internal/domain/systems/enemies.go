@@ -208,15 +208,24 @@ func StepEnemies(w *world.World) {
 		}
 	}
 
-	// Удаляем мёртвых + призраков мёртвых призывателей.
 	alive := w.Enemies[:0]
 	for i := range w.Enemies {
 		e := w.Enemies[i]
 		if e.IsDead() {
+			// Монета.
+			ecx, ecy := e.Center()
+			value := 1
+			if e.Type == world.EnemyTank ||
+				e.Type == world.EnemyMachineGunner ||
+				e.Type == world.EnemySummoner ||
+				e.Type == world.EnemyFlamer {
+				value = world.CoinBossBonus
+			}
+			SpawnCoinAt(w, ecx, ecy, value)
 			continue
 		}
 		if e.Type == world.EnemyGhost && deadSummoners[e.OwnerSummonerID] {
-			continue // призыватель умер — призрак исчезает
+			continue // призрак исчез, монеты нет
 		}
 		alive = append(alive, e)
 	}

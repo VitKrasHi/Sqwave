@@ -300,5 +300,12 @@ func drawHPBar(r SceneRenderer, hp, maxHP int) {
 	if ratio > 0 {
 		r.DrawScreenRect(x, y, barW*ratio, barH, c)
 	}
-	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y+1, ColorMenuText)
+	r.DrawScreenText(fmt.Sprintf("HP %d / %d", hp, maxHP), x+6, y-10, ColorMenuText)
+}
+
+func drawCoinCounter(r SceneRenderer, p *world.Player) {
+	x := 8.0
+	y := float64(world.ScreenHeight) - 18 - 16 - 26 // над HP-баром
+	c := color.NRGBA{R: 255, G: 210, B: 60, A: 255}
+	r.DrawScreenText(fmt.Sprintf("Coins: %d", p.Coins), x, y, c)
 }
