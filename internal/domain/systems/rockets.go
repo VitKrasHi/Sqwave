@@ -85,7 +85,7 @@ func StepRockets(w *world.World) {
 		// Прямое попадание во врага.
 		if directHit != nil {
 			if !directHit.Invulnerable && !BlocksDamageFrom(directHit, r.X, r.Y) {
-				directHit.TakeDamage(weapon.DirectHitDamage)
+				DealDamageToEnemy(w, directHit, weapon.DirectHitDamage)
 			}
 		}
 
@@ -124,7 +124,7 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 		}
 		cx, cy := e.Center()
 		if math.Hypot(cx-x, cy-y) <= radius {
-			e.TakeDamage(damage)
+			DealDamageToEnemy(w, e, damage)
 		}
 	}
 

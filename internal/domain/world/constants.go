@@ -74,5 +74,16 @@ const (
 	MedicPlayerFleeRange   = 140.0
 
 	// Цена полного отхила в меню спавна.
-	FullHPPrice = 5
+	FullHPPrice = 25
+
+	// Модуль Vulnerability.
+	VulnMarkTicks  = 5 * 60 // 5 сек
+	VulnDamageMul  = 4
+	VulnPenaltyDiv = 4 // -25% HP при промахе
+
+	// Модуль Rate of Fire.
+	RoFMaxStacks      = 10
+	RoFBaseMultiplier = 2.0  // ×2 кулдаун при 0 стаках (штраф -50%)
+	RoFDecayPerStack  = 0.15 // каждый стак уменьшает множитель
+	RoFMinMultiplier  = 0.5  // минимум ×0.5 базового (×2 скорострельность)
 )

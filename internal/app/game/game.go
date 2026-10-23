@@ -161,6 +161,7 @@ func (g *Game) Update() error {
 	}
 
 	systems.StepPlayer(g.world, in)
+	systems.StepModules(g.world)
 	systems.StepWeaponSelection(g.world, in)
 	systems.StepShooting(g.world, in)
 	systems.StepBullets(g.world)
@@ -415,6 +416,38 @@ func (g *Game) Draw(r SceneRenderer) {
 		r.DrawScreenTextScaled("HARPOONED - SHOOT THE CHAIN",
 			8, float64(world.ScreenHeight)-120, 1.4,
 			color.NRGBA{R: 255, G: 200, B: 60, A: 255})
+	}
+
+	if w.Player.ActiveModule != world.ModuleNone {
+		r.DrawScreenTextScaled(
+			fmt.Sprintf("MODULE: %s", w.Player.ActiveModule.Stats().Name),
+			8, 110, 1.2,
+			color.NRGBA{R: 255, G: 100, B: 180, A: 255})
+
+		// Vulnerability: индикатор активной метки.
+		if w.Player.ActiveModule == world.ModuleVulnerability && w.Player.VulnArmed {
+			ratio := float64(w.Player.VulnTimer) / float64(world.VulnMarkTicks)
+			sec := float64(w.Player.VulnTimer) / 60.0
+
+			// Цвет от зелёного к красному по мере истечения.
+			rr := uint8(255 * (1 - ratio))
+			gg := uint8(255 * ratio)
+			c := color.NRGBA{R: rr, G: gg, B: 80, A: 255}
+
+			r.DrawScreenTextScaled(
+				fmt.Sprintf("MARK %.1fs — hit for x4", sec),
+				8, 130, 1.2, c)
+		}
+		// Rate of Fire: индикатор стаков.
+		if w.Player.ActiveModule == world.ModuleRateOfFire {
+			stacks := w.Player.RoFStacks
+			c := color.NRGBA{R: 255, G: 140, B: 40, A: 255}
+			text := fmt.Sprintf("RoF: %d/%d", stacks, world.RoFMaxStacks)
+			if stacks == 0 {
+				c = color.NRGBA{R: 150, G: 100, B: 60, A: 255}
+			}
+			r.DrawScreenTextScaled(text, 8, 130, 1.2, c)
+		}
 	}
 
 	// HUD — рисуется только если включён.

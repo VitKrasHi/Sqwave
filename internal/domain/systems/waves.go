@@ -751,9 +751,9 @@ func endWave(w *world.World) {
 	ws.Active = false
 	ws.PauseTimer = wavePauseTicks
 
-	// Сбрасываем только эффекты, HP не трогаем.
-	w.Player.BurnTimer = 0
-	w.Player.BurnTick = 0
-	w.Player.Harpooned = false
-	w.Player.HarpoonID = -1
+	// Модуль работает одну волну — сбрасываем.
+	w.Player.ActiveModule = world.ModuleNone
+	w.Player.VulnArmed = false
+	w.Player.VulnTimer = 0
+	w.Player.RoFStacks = 0
 }

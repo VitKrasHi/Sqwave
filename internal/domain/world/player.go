@@ -74,6 +74,16 @@ type Player struct {
 
 	// Монеты, выпавшие из врагов.
 	Coins int
+
+	// Активный модуль. Работает одну волну, потом сбрасывается.
+	ActiveModule ModuleType
+
+	// Модуль Vulnerability: метка на 5 сек.
+	VulnArmed bool
+	VulnTimer int
+
+	// Модуль Rate of Fire: стаки за попадания.
+	RoFStacks int
 }
 
 func (p *Player) Rect() geometry.Rect {

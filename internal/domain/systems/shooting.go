@@ -46,16 +46,24 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	}
 	baseAngle := math.Atan2(aimDY, aimDX)
 
+	var anyHit bool
 	for i := 0; i < weapon.Pellets; i++ {
 		angle := baseAngle + spreadOffset(w.Rng, weapon.Spread)
 		if weapon.ProjectileSpeed > 0 {
 			spawnRocket(w, cx, cy, angle, weapon)
 		} else {
-			fireRay(w, cx, cy, angle, 0)
+			if fireRay(w, cx, cy, angle, 0) {
+				anyHit = true
+			}
 		}
 	}
 
-	p.FireCooldownTimer = weapon.FireCooldown
+	p.FireCooldownTimer = effectiveFireCooldown(p, weapon.FireCooldown)
+
+	// Стек RoF — только для hitscan (ракетница не учитывается).
+	if weapon.ProjectileSpeed == 0 {
+		updateRoFStacks(p, anyHit)
+	}
 }
 
 // stepPlayerSniper — зажал ЛКМ → копится заряд, отпустил → выстрел.
@@ -87,14 +95,16 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 		if chargeRatio > 1 {
 			chargeRatio = 1
 		}
+		var hit bool
 		if weapon.MaxPierce > 1 {
-			fireSniperPierce(w, cx, cy, baseAngle, chargeRatio)
+			hit = fireSniperPierce(w, cx, cy, baseAngle, chargeRatio)
 		} else {
-			fireRay(w, cx, cy, baseAngle, chargeRatio)
+			hit = fireRay(w, cx, cy, baseAngle, chargeRatio)
 		}
 
 		p.AimCharge = 0
-		p.FireCooldownTimer = weapon.FireCooldown
+		p.FireCooldownTimer = effectiveFireCooldown(p, weapon.FireCooldown)
+		updateRoFStacks(p, hit)
 
 	default:
 		p.AimCharge = 0
@@ -147,7 +157,7 @@ func stepMelee(w *world.World, in input.PlayerInput) {
 // fireRay пускает hitscan-луч. Ищет ближайшее попадание среди стен,
 // врагов, турелей, зацепленных гарпунов и вражеских спавнов.
 // Урон наносится в зависимости от того, во что попал.
-func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
+func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 	weapon := w.Player.Weapon.Stats()
 	cos := math.Cos(angle)
 	sin := math.Sin(angle)
@@ -248,7 +258,7 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		if !hitEnemy.Invulnerable && !BlocksDamageFrom(hitEnemy, startX, startY) {
 			distance := enemyT * weapon.Range
 			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
-			hitEnemy.TakeDamage(dmg)
+			DealDamageToEnemy(w, hitEnemy, dmg)
 		}
 	} else if hitTurret != nil {
 		// Турели неуязвимы до конца волны.
@@ -281,6 +291,8 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) {
 		MaxLife: weapon.VisualLife,
 		Weapon:  w.Player.Weapon,
 	})
+
+	return hitEnemy != nil || hitTurret != nil || hitHarpoon != nil || hitSpawn != nil
 }
 
 // applyMeleeHit проверяет текущее положение клинка против врагов,
@@ -346,7 +358,7 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 			}
 		} else {
 			dmg := p.Weapon.DamageAt(0, 1)
-			e.TakeDamage(dmg)
+			DealDamageToEnemy(w, e, dmg)
 
 			// Оглушение мечом — работает на всех врагов.
 			if weapon.StunOnHit > 0 {
@@ -427,7 +439,7 @@ func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
 // fireSniperPierce — выстрел снайперки, пробивающий несколько врагов.
 // Количество пробитых = 1 + AimChargeRatio * (MaxPierce - 1).
 // Каждый следующий враг получает меньше урона (-PierceDamageFalloff от базы).
-func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
+func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 	weapon := w.Player.Weapon.Stats()
 	cos := math.Cos(angle)
 	sin := math.Sin(angle)
@@ -526,7 +538,7 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
 			if dmg < 1 {
 				dmg = 1
 			}
-			h.e.TakeDamage(dmg)
+			DealDamageToEnemy(w, h.e, dmg)
 		}
 
 		endT = h.t
@@ -565,4 +577,6 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) {
 		MaxLife: weapon.VisualLife,
 		Weapon:  w.Player.Weapon,
 	})
+
+	return len(hits) > 0 || hitSpawn != nil
 }
