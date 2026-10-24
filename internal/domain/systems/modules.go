@@ -38,14 +38,22 @@ func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
 func StepModules(w *world.World) {
 	p := &w.Player
 
+	// Тик анонса модуля.
+	if p.ModuleAnnounce > 0 {
+		p.ModuleAnnounce--
+	}
+
+	// В паузе между волнами модули не тикают.
+	if !w.Wave.Active {
+		return
+	}
+
 	if p.ActiveModule != world.ModuleVulnerability {
 		return
 	}
-
 	if !p.VulnArmed {
 		return
 	}
-
 	p.VulnTimer--
 	if p.VulnTimer <= 0 {
 		penalty := p.CurrentHP() / world.VulnPenaltyDiv

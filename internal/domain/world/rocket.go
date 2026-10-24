@@ -15,6 +15,8 @@ type Rocket struct {
 
 	ExplosionRadius float64
 	ExplosionLife   int
+
+	DamageOverride int
 }
 
 func (r *Rocket) Rect() geometry.Rect {

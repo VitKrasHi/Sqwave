@@ -11,7 +11,6 @@ import (
 const (
 	TabWeapons = 0
 	TabFullHP  = 1
-	TabModules = 2
 )
 
 type Menu struct {
@@ -28,12 +27,6 @@ var menuWeapons = []world.WeaponType{
 	world.WeaponRocket,
 	world.WeaponSword,
 	world.WeaponShield,
-}
-
-var menuModules = []world.ModuleType{
-	world.ModuleBloodExchange,
-	world.ModuleVulnerability,
-	world.ModuleRateOfFire,
 }
 
 func (m *Menu) Reset(p *world.Player) {
@@ -66,11 +59,11 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 	}
 
 	if in.MenuLeft {
-		m.Tab = (m.Tab - 1 + 3) % 3
+		m.Tab = (m.Tab - 1 + 2) % 2
 		m.Selection = 0
 	}
 	if in.MenuRight {
-		m.Tab = (m.Tab + 1) % 3
+		m.Tab = (m.Tab + 1) % 2
 		m.Selection = 0
 	}
 
@@ -109,7 +102,7 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 		if in.MenuConfirm {
 			p := &w.Player
 			if p.ActiveModule == world.ModuleBloodExchange {
-				return false // нельзя лечиться на базе
+				return false
 			}
 			if p.Damage == 0 {
 				return false
@@ -119,32 +112,6 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 			}
 			p.Coins -= world.FullHPPrice
 			p.Damage = 0
-		}
-	case TabModules:
-		if in.MenuUp {
-			m.Selection--
-			if m.Selection < 0 {
-				m.Selection = len(menuModules) - 1
-			}
-		}
-		if in.MenuDown {
-			m.Selection++
-			if m.Selection >= len(menuModules) {
-				m.Selection = 0
-			}
-		}
-		if in.MenuConfirm {
-			p := &w.Player
-			if p.ActiveModule != world.ModuleNone {
-				return false // уже есть активный модуль
-			}
-			picked := menuModules[m.Selection]
-			price := picked.Stats().Price
-			if p.Coins < price {
-				return false
-			}
-			p.Coins -= price
-			p.ActiveModule = picked
 		}
 	}
 
@@ -173,13 +140,12 @@ func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
 	}{
 		{TabWeapons, "Weapons"},
 		{TabFullHP, "Full HP"},
-		{TabModules, "Modules"},
 	}
 
 	const (
-		tabPad = 20.0 // отступ от края панели
-		tabGap = 10.0 // промежуток между табами
-		tabN   = 3
+		tabPad = 20.0
+		tabGap = 10.0
+		tabN   = 2
 	)
 	tabW := (panelW - 2*tabPad - float64(tabN-1)*tabGap) / float64(tabN)
 	for i, t := range tabs {
@@ -209,8 +175,6 @@ func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
 		drawWeaponsTab(r, m, p, px, panelW, contentY)
 	case TabFullHP:
 		drawFullHPTab(r, p, px, panelW, contentY)
-	case TabModules:
-		drawModulesTab(r, m, p, px, panelW, contentY)
 	}
 
 	r.DrawScreenText(fmt.Sprintf("Coins: %d", p.Coins),
@@ -305,56 +269,4 @@ func weaponLabel(w world.WeaponType) string {
 		return "-"
 	}
 	return w.Stats().Name
-}
-
-func drawModulesTab(r SceneRenderer, m *Menu, p *world.Player, px, panelW, topY float64) {
-	// Активный модуль.
-	if p.ActiveModule != world.ModuleNone {
-		r.DrawScreenText("Active: "+p.ActiveModule.Stats().Name,
-			px+20, topY, ColorMenuSelected)
-	} else {
-		r.DrawScreenText("Active: none", px+20, topY, ColorMenuDim)
-	}
-
-	listY := topY + 40
-	for i, mt := range menuModules {
-		y := listY + float64(i)*60
-		st := mt.Stats()
-
-		marker := "  "
-		c := ColorMenuText
-		canBuy := p.ActiveModule == world.ModuleNone && p.Coins >= st.Price
-
-		switch {
-		case i == m.Selection && !canBuy:
-			marker = "> "
-			c = ColorMenuDim
-		case i == m.Selection:
-			marker = "> "
-			c = ColorMenuSelected
-		case !canBuy:
-			c = ColorMenuDim
-		}
-
-		label := marker + st.Name + fmt.Sprintf("  (%d coins)", st.Price)
-		r.DrawScreenText(label, px+40, y, c)
-		r.DrawScreenText(st.Description, px+60, y+20, ColorMenuDim)
-	}
-
-	// Статус покупки.
-	statusY := listY + float64(len(menuModules))*60 + 10
-	if p.ActiveModule != world.ModuleNone {
-		r.DrawScreenText("Module already active — works this wave only",
-			px+20, statusY, ColorMenuDim)
-	} else {
-		st := menuModules[m.Selection].Stats()
-		if p.Coins < st.Price {
-			need := st.Price - p.Coins
-			r.DrawScreenText(fmt.Sprintf("Need %d more coins", need),
-				px+20, statusY, ColorHPLow)
-		} else {
-			r.DrawScreenText("[Enter] Buy module",
-				px+20, statusY, ColorMenuSelected)
-		}
-	}
 }

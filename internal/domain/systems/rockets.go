@@ -85,7 +85,11 @@ func StepRockets(w *world.World) {
 		// Прямое попадание во врага.
 		if directHit != nil {
 			if !directHit.Invulnerable && !BlocksDamageFrom(directHit, r.X, r.Y) {
-				DealDamageToEnemy(w, directHit, weapon.DirectHitDamage)
+				dmg := weapon.DirectHitDamage
+				if r.DamageOverride > 0 {
+					dmg = r.DamageOverride
+				}
+				DealDamageToEnemy(w, directHit, dmg)
 			}
 		}
 

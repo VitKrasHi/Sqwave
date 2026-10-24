@@ -84,6 +84,9 @@ type Player struct {
 
 	// Модуль Rate of Fire: стаки за попадания.
 	RoFStacks int
+
+	// Оставшиеся тики показа уведомления «получен модуль».
+	ModuleAnnounce int
 }
 
 func (p *Player) Rect() geometry.Rect {

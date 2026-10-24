@@ -751,9 +751,25 @@ func endWave(w *world.World) {
 	ws.Active = false
 	ws.PauseTimer = wavePauseTicks
 
-	// Модуль работает одну волну — сбрасываем.
+	// Сброс текущего модуля.
 	w.Player.ActiveModule = world.ModuleNone
 	w.Player.VulnArmed = false
 	w.Player.VulnTimer = 0
 	w.Player.RoFStacks = 0
+
+	// Проигрыш в Defend — модуль не выдаём.
+	if ws.DefendOutcome == -1 {
+		return
+	}
+
+	// Шанс 30% получить случайный модуль на следующую волну.
+	if w.Rng.Intn(100) < 30 {
+		pool := []world.ModuleType{
+			world.ModuleBloodExchange,
+			world.ModuleVulnerability,
+			world.ModuleRateOfFire,
+		}
+		w.Player.ActiveModule = pool[w.Rng.Intn(len(pool))]
+		w.Player.ModuleAnnounce = 180 // 3 сек анонса
+	}
 }

@@ -450,6 +450,16 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 	}
 
+	// Анонс полученного модуля.
+	if w.Player.ModuleAnnounce > 0 {
+		pulse := uint8(180 + 75*math.Sin(float64(w.Player.ModuleAnnounce)*0.2))
+		r.DrawScreenTextScaled(
+			fmt.Sprintf("NEW MODULE: %s",
+				w.Player.ActiveModule.Stats().Name),
+			float64(world.ScreenWidth)/2-140, 40, 1.8,
+			color.NRGBA{R: 255, G: 220, B: 100, A: pulse})
+	}
+
 	// HUD — рисуется только если включён.
 	if g.hudVisible {
 		// Подсказки.
