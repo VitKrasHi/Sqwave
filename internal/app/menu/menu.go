@@ -24,9 +24,14 @@ type Menu struct {
 	buttons  []*Button
 	selected int
 	ps       []particles.Particle
+	glitch   bool
 
 	music    *audio.Player
 	settings *settings.Panel
+}
+
+func (m *Menu) SetGlitchMode(g bool) {
+	m.glitch = g
 }
 
 func New(music *audio.Player, onStart, onExit func()) *Menu {
@@ -68,7 +73,7 @@ func (m *Menu) Update() error {
 	}
 
 	particles.Update(m.ps, panelW+20, float64(world.ScreenWidth)-20,
-		20, float64(world.ScreenHeight)-20)
+		20, float64(world.ScreenHeight)-20, m.glitch)
 
 	if m.settings.Open {
 		if m.settings.Update() {

@@ -20,10 +20,6 @@ type Settings struct {
 }
 
 const (
-	minEnemies  = 10
-	maxEnemies  = 300
-	stepEnemies = 5
-
 	minWaves = 0
 	maxWaves = 99
 
@@ -34,8 +30,7 @@ const (
 type row int
 
 const (
-	rowEnemies row = iota
-	rowWaves
+	rowWaves row = iota
 	rowStart
 	rowBack
 	rowCount
@@ -58,7 +53,7 @@ func New(onStart func(Settings), onBack func()) *Scene {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	s := &Scene{
 		settings: Settings{
-			EnemiesPerWave: 100,
+			EnemiesPerWave: 100, // фиксированное значение
 			WavesLimit:     0,
 		},
 		onStart: onStart,
@@ -75,24 +70,38 @@ func panelOrigin() (float64, float64) {
 	return (sw - panelW) / 2, (sh - panelH) / 2
 }
 
+// rowRect — координаты строки для hit-test и отрисовки.
 func (s *Scene) rowRect(idx row) (x, y, w, h float64) {
 	px, py := panelOrigin()
 	switch idx {
-	case rowEnemies:
-		return px + 30, py + 140, panelW - 60, 40
 	case rowWaves:
-		return px + 30, py + 215, panelW - 60, 40
+		return px + 30, py + 160, panelW - 60, 60
 	case rowStart:
-		return px + 60, py + 330, panelW - 120, 50
+		return px + 60, py + 320, panelW - 120, 50
 	case rowBack:
-		return px + 60, py + 404, panelW - 120, 50
+		return px + 60, py + 390, panelW - 120, 50
 	}
 	return 0, 0, 0, 0
 }
 
+// Кнопки +/- по бокам от строки Waves to win.
+func (s *Scene) waveMinusButtonRect() (x, y, w, h float64) {
+	rx, ry, rw, _ := s.rowRect(rowWaves)
+	return rx + rw - 190, ry + 10, 50, 40
+}
+
+func (s *Scene) wavePlusButtonRect() (x, y, w, h float64) {
+	rx, ry, rw, _ := s.rowRect(rowWaves)
+	return rx + rw - 60, ry + 10, 50, 40
+}
+
+func pointInRect(px, py, x, y, w, h float64) bool {
+	return px >= x && px <= x+w && py >= y && py <= y+h
+}
+
 func (s *Scene) Update() error {
 	particles.Update(s.ps, 40, float64(world.ScreenWidth)-40,
-		40, float64(world.ScreenHeight)-40)
+		40, float64(world.ScreenHeight)-40, false)
 
 	// Навигация по строкам.
 	if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) || inpututil.IsKeyJustPressed(ebiten.KeyS) {
@@ -107,9 +116,30 @@ func (s *Scene) Update() error {
 	fx, fy := float64(mx), float64(my)
 
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		// Кнопки +/-.
+		bx, by, bw, bh := s.waveMinusButtonRect()
+		if pointInRect(fx, fy, bx, by, bw, bh) {
+			s.selected = int(rowWaves)
+			s.settings.WavesLimit--
+			if s.settings.WavesLimit < minWaves {
+				s.settings.WavesLimit = maxWaves
+			}
+			return nil
+		}
+		bx, by, bw, bh = s.wavePlusButtonRect()
+		if pointInRect(fx, fy, bx, by, bw, bh) {
+			s.selected = int(rowWaves)
+			s.settings.WavesLimit++
+			if s.settings.WavesLimit > maxWaves {
+				s.settings.WavesLimit = minWaves
+			}
+			return nil
+		}
+
+		// Остальные строки.
 		for i := row(0); i < rowCount; i++ {
 			x, y, w, h := s.rowRect(i)
-			if fx >= x && fx <= x+w && fy >= y && fy <= y+h {
+			if pointInRect(fx, fy, x, y, w, h) {
 				s.selected = int(i)
 				if i == rowStart {
 					s.onStart(s.settings)
@@ -119,17 +149,6 @@ func (s *Scene) Update() error {
 					s.onBack()
 					return nil
 				}
-				switch i {
-				case rowWaves:
-					if s.settings.WavesLimit == 0 {
-						s.settings.WavesLimit = 5
-					} else {
-						s.settings.WavesLimit++
-						if s.settings.WavesLimit > maxWaves {
-							s.settings.WavesLimit = 0
-						}
-					}
-				}
 				break
 			}
 		}
@@ -137,8 +156,6 @@ func (s *Scene) Update() error {
 
 	// Клавиатура для строк.
 	switch row(s.selected) {
-	case rowEnemies:
-		s.handleNumericInput(&s.settings.EnemiesPerWave, stepEnemies, minEnemies, maxEnemies)
 	case rowWaves:
 		s.handleWavesInput()
 	case rowStart:
@@ -155,46 +172,6 @@ func (s *Scene) Update() error {
 		s.onBack()
 	}
 	return nil
-}
-
-func (s *Scene) handleNumericInput(val *int, step, minVal, maxVal int) {
-	leftHeld := ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
-	rightHeld := ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD)
-
-	dir := 0
-	if leftHeld && !rightHeld {
-		dir = -1
-	} else if rightHeld && !leftHeld {
-		dir = 1
-	}
-
-	if dir == 0 {
-		s.heldDir = 0
-		s.repeatDelay = 0
-		s.repeatRate = 0
-		return
-	}
-
-	if dir != s.heldDir {
-		s.heldDir = dir
-		s.repeatDelay = 15
-		s.repeatRate = 4
-		*val += dir * step
-		s.clamp(val, minVal, maxVal)
-		return
-	}
-
-	if s.repeatDelay > 0 {
-		s.repeatDelay--
-		return
-	}
-	if s.repeatRate > 0 {
-		s.repeatRate--
-		return
-	}
-	*val += dir * step
-	s.clamp(val, minVal, maxVal)
-	s.repeatRate = 4
 }
 
 func (s *Scene) handleWavesInput() {
@@ -220,11 +197,11 @@ func (s *Scene) handleWavesInput() {
 		s.repeatDelay = 15
 		s.repeatRate = 4
 		s.settings.WavesLimit += dir
-		if s.settings.WavesLimit < 0 {
-			s.settings.WavesLimit = 0
+		if s.settings.WavesLimit < minWaves {
+			s.settings.WavesLimit = maxWaves
 		}
 		if s.settings.WavesLimit > maxWaves {
-			s.settings.WavesLimit = maxWaves
+			s.settings.WavesLimit = minWaves
 		}
 		return
 	}
@@ -238,22 +215,13 @@ func (s *Scene) handleWavesInput() {
 		return
 	}
 	s.settings.WavesLimit += dir
-	if s.settings.WavesLimit < 0 {
-		s.settings.WavesLimit = 0
-	}
-	if s.settings.WavesLimit > maxWaves {
+	if s.settings.WavesLimit < minWaves {
 		s.settings.WavesLimit = maxWaves
 	}
+	if s.settings.WavesLimit > maxWaves {
+		s.settings.WavesLimit = minWaves
+	}
 	s.repeatRate = 4
-}
-
-func (s *Scene) clamp(val *int, minVal, maxVal int) {
-	if *val < minVal {
-		*val = minVal
-	}
-	if *val > maxVal {
-		*val = maxVal
-	}
 }
 
 func (s *Scene) Draw(r game.SceneRenderer) {
@@ -273,41 +241,59 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 	r.DrawScreenRect(px+40, py+86, panelW-80, 2,
 		color.NRGBA{R: 60, G: 80, B: 110, A: 200})
 
+	// Waves to win — с кнопками +/-.
 	wavesValue := "0 (endless)"
 	if s.settings.WavesLimit > 0 {
 		wavesValue = fmt.Sprintf("%d", s.settings.WavesLimit)
 	}
-
-	s.drawNumericRow(r, rowEnemies, "Enemies per wave",
-		fmt.Sprintf("%d", s.settings.EnemiesPerWave))
-	s.drawNumericRow(r, rowWaves, "Waves to win", wavesValue)
+	s.drawWavesRow(r, wavesValue)
 
 	s.drawButton(r, rowStart, "Start")
 	s.drawButton(r, rowBack, "Back")
 
 	r.DrawScreenText("UP/DOWN select   LEFT/RIGHT change   Enter confirm   Esc back",
-		px+40, py+panelH-36, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
+		px+40, py+panelH-30, color.NRGBA{R: 110, G: 130, B: 160, A: 255})
 }
 
-func (s *Scene) drawNumericRow(r game.SceneRenderer, idx row, label, value string) {
-	x, y, _, _ := s.rowRect(idx)
-	selected := int(idx) == s.selected
+func (s *Scene) drawWavesRow(r game.SceneRenderer, value string) {
+	rx, ry, rw, _ := s.rowRect(rowWaves)
+	selected := s.selected == int(rowWaves)
 
 	if selected {
 		hl := color.NRGBA{R: 40, G: 70, B: 110, A: 120}
-		r.DrawScreenRect(x, y, panelW-60, 40, hl)
+		r.DrawScreenRect(rx, ry, rw, 60, hl)
 		marker := color.NRGBA{R: 120, G: 230, B: 255, A: 255}
-		r.DrawScreenRect(x-10, y+15, 6, 10, marker)
+		r.DrawScreenRect(rx-10, ry+25, 6, 10, marker)
 	}
 
 	textCol := color.NRGBA{R: 200, G: 210, B: 230, A: 255}
-	valueCol := color.NRGBA{R: 120, G: 230, B: 255, A: 255}
-	if !selected {
-		valueCol = color.NRGBA{R: 180, G: 190, B: 210, A: 255}
+	r.DrawScreenText("Waves to win", rx+10, ry, textCol)
+	r.DrawScreenText(value, rx+10, ry+22, color.NRGBA{R: 120, G: 230, B: 255, A: 255})
+
+	mx, my, mw, mh := s.waveMinusButtonRect()
+	s.drawRoundButton(r, mx, my, mw, mh, "-")
+
+	px2, py2, pw, ph := s.wavePlusButtonRect()
+	s.drawRoundButton(r, px2, py2, pw, ph, "+")
+}
+
+func (s *Scene) drawRoundButton(r game.SceneRenderer, x, y, w, h float64, label string) {
+	bg := color.NRGBA{R: 26, G: 32, B: 44, A: 255}
+	border := color.NRGBA{R: 60, G: 80, B: 110, A: 255}
+
+	if s.selected == int(rowWaves) {
+		bg = color.NRGBA{R: 40, G: 70, B: 110, A: 255}
+		border = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
 	}
 
-	r.DrawScreenText(label, x+10, y, textCol)
-	r.DrawScreenText(value, x+330, y, valueCol)
+	r.DrawScreenRect(x-2, y-2, w+4, h+4, border)
+	r.DrawScreenRect(x, y, w, h, bg)
+
+	// Центрируем символ.
+	scale := 3.0
+	textW := float64(len(label)) * 7.0 * scale
+	r.DrawScreenTextScaled(label, x+(w-textW)/2, y+h/2-50, scale,
+		color.NRGBA{R: 240, G: 250, B: 255, A: 255})
 }
 
 func (s *Scene) drawButton(r game.SceneRenderer, idx row, label string) {

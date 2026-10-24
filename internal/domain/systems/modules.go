@@ -11,6 +11,8 @@ func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
 		return
 	}
 
+	w.Stats.DamageDealt += dmg
+
 	p := &w.Player
 
 	switch p.ActiveModule {

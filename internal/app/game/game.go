@@ -26,6 +26,8 @@ type Game struct {
 	menu         Menu
 	onPlayerDied func()
 	deathFired   bool
+	onVictory    func()
+	victoryFired bool
 
 	paused         bool
 	pauseSelection int
@@ -40,6 +42,9 @@ type Game struct {
 	hudVisible bool
 
 	music *audio.Player
+
+	pauseBtnHovered bool
+	hudBtnHovered   bool
 }
 
 func (g *Game) SetOnPlayerDied(f func()) {
@@ -71,6 +76,14 @@ func New(w *world.World, in InputSource, music *audio.Player) *Game {
 // SetOnExitToMenu задаёт колбэк для выхода из игры в главное меню.
 func (g *Game) SetOnExitToMenu(f func()) {
 	g.onExitToMenu = f
+}
+
+func (g *Game) SetOnVictory(f func()) {
+	g.onVictory = f
+}
+
+func (g *Game) Stats() *world.Stats {
+	return &g.world.Stats
 }
 
 func (g *Game) Update() error {
@@ -121,7 +134,32 @@ func (g *Game) Update() error {
 		if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) || inpututil.IsKeyJustPressed(ebiten.KeyS) {
 			g.pauseSelection = (g.pauseSelection + 1) % 3
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+
+		// Мышь: hover и клик по кнопкам.
+		mx, my := ebiten.CursorPosition()
+		fx, fy := float64(mx), float64(my)
+		hovered := -1
+		for i := 0; i < 3; i++ {
+			bx, by, bw, bh := pauseButtonRect(i)
+			if fx >= bx && fx <= bx+bw && fy >= by && fy <= by+bh {
+				hovered = i
+				break
+			}
+		}
+		if hovered >= 0 {
+			g.pauseSelection = hovered
+		}
+
+		clicked := false
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) && hovered >= 0 {
+			clicked = true
+		}
+
+		confirm := inpututil.IsKeyJustPressed(ebiten.KeyEnter) ||
+			inpututil.IsKeyJustPressed(ebiten.KeySpace) ||
+			clicked
+
+		if confirm {
 			switch g.pauseSelection {
 			case 0: // Settings
 				g.settings.Open = true
@@ -141,6 +179,29 @@ func (g *Game) Update() error {
 	in.AimX = (in.AimX-float64(world.ScreenWidth)/2)/g.camera.Zoom + g.camera.X
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y
 	g.lastInput = in
+
+	// Кнопки паузы и HUD (мышь).
+	mx, my := ebiten.CursorPosition()
+	fx, fy := float64(mx), float64(my)
+
+	// Кнопка паузы.
+	px, py, pw, ph := pauseIconRect()
+	g.pauseBtnHovered = pointInButton(fx, fy, px, py, pw, ph)
+	if g.pauseBtnHovered && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		g.paused = !g.paused
+		if g.paused {
+			g.pauseSelection = 1
+		}
+		return nil
+	}
+
+	// Кнопка HUD.
+	hx, hy, hw, hh := hudIconRect()
+	g.hudBtnHovered = pointInButton(fx, fy, hx, hy, hw, hh)
+	if g.hudBtnHovered && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		g.hudVisible = !g.hudVisible
+		return nil
+	}
 
 	// Открыть меню.
 	if in.Interact && !g.menu.Open && g.world.PlayerInSpawnZone() {
@@ -198,6 +259,14 @@ func (g *Game) Update() error {
 		g.deathFired = true
 		if g.onPlayerDied != nil {
 			g.onPlayerDied()
+		}
+	}
+
+	// Победа — все волны пройдены.
+	if !g.victoryFired && g.world.Wave.IsVictory() && !g.world.Player.IsDead() {
+		g.victoryFired = true
+		if g.onVictory != nil {
+			g.onVictory()
 		}
 	}
 
@@ -521,6 +590,8 @@ func (g *Game) Draw(r SceneRenderer) {
 	if g.paused {
 		drawPauseMenu(r, g.pauseSelection)
 	}
+
+	drawGameButtons(r, g.pauseBtnHovered, g.hudBtnHovered, g.hudVisible)
 
 	// Settings — поверх паузы.
 	g.settings.Draw(r)
@@ -1357,8 +1428,23 @@ func drawPauseMenu(r SceneRenderer, selected int) {
 		}
 		r.DrawScreenRect(btnX-2, y-2, btnW+4, btnH+4, borderBtn)
 		r.DrawScreenRect(btnX, y, btnW, btnH, bgBtn)
-		r.DrawScreenTextScaled(label, btnX+20, y+10, 1.8, textBtn)
+		r.DrawScreenTextScaled(label, btnX+20, y, 1.8, textBtn)
 	}
+}
+
+func pauseButtonRect(i int) (x, y, w, h float64) {
+	sw := float64(world.ScreenWidth)
+	sh := float64(world.ScreenHeight)
+	panelW := 400.0
+	panelH := 340.0
+	px := (sw - panelW) / 2
+	py := (sh - panelH) / 2
+	btnW := panelW - 100
+	btnX := px + 50
+	btnH := 50.0
+	gap := 16.0
+	btnY := py + 120
+	return btnX, btnY + float64(i)*(btnH+gap), btnW, btnH
 }
 
 func drawCoins(r SceneRenderer, w *world.World, ticks int) {
@@ -1370,5 +1456,74 @@ func drawCoins(r SceneRenderer, w *world.World, ticks int) {
 		// Тело монеты.
 		r.DrawCircle(c.X, c.Y, rad, color.NRGBA{R: 255, G: 210, B: 60, A: 255})
 		r.DrawCircle(c.X, c.Y, rad*0.6, color.NRGBA{R: 255, G: 240, B: 140, A: 255})
+	}
+}
+
+func pauseIconRect() (x, y, w, h float64) {
+	sw := float64(world.ScreenWidth)
+	return sw - 360, 12, 36, 36
+}
+
+func hudIconRect() (x, y, w, h float64) {
+	sw := float64(world.ScreenWidth)
+	return sw - 320, 12, 36, 36
+}
+
+func pointInButton(px, py, x, y, w, h float64) bool {
+	return px >= x && px <= x+w && py >= y && py <= y+h
+}
+
+func drawGameButtons(r SceneRenderer, pauseHovered, hudHovered, hudVisible bool) {
+	// Пауза.
+	px, py, pw, ph := pauseIconRect()
+	{
+		bg := color.NRGBA{R: 26, G: 32, B: 44, A: 220}
+		border := color.NRGBA{R: 60, G: 80, B: 110, A: 220}
+		if pauseHovered {
+			bg = color.NRGBA{R: 40, G: 70, B: 110, A: 240}
+			border = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
+		}
+		r.DrawScreenRect(px-2, py-2, pw+4, ph+4, border)
+		r.DrawScreenRect(px, py, pw, ph, bg)
+
+		// Две вертикальные палочки.
+		const barW = 4.0
+		const barH = 16.0
+		cx := px + pw/2
+		cy := py + ph/2
+		r.DrawScreenRect(cx-6, cy-barH/2, barW, barH,
+			color.NRGBA{R: 240, G: 250, B: 255, A: 255})
+		r.DrawScreenRect(cx+2, cy-barH/2, barW, barH,
+			color.NRGBA{R: 240, G: 250, B: 255, A: 255})
+	}
+
+	// HUD.
+	hx, hy, hw, hh := hudIconRect()
+	{
+		bg := color.NRGBA{R: 26, G: 32, B: 44, A: 220}
+		border := color.NRGBA{R: 60, G: 80, B: 110, A: 220}
+		if hudHovered {
+			bg = color.NRGBA{R: 40, G: 70, B: 110, A: 240}
+			border = color.NRGBA{R: 120, G: 230, B: 255, A: 255}
+		}
+		if hudVisible {
+			// Активный — подсвеченный фон.
+			bg = color.NRGBA{R: 40, G: 70, B: 110, A: 240}
+		}
+		r.DrawScreenRect(hx-2, hy-2, hw+4, hh+4, border)
+		r.DrawScreenRect(hx, hy, hw, hh, bg)
+
+		// Три горизонтальные полоски (иконка списка / HUD).
+		const barW = 18.0
+		const barH = 3.0
+		cx := hx + hw/2
+		cy := hy + hh/2
+		c := color.NRGBA{R: 240, G: 250, B: 255, A: 255}
+		if !hudVisible {
+			c = color.NRGBA{R: 140, G: 150, B: 170, A: 255}
+		}
+		r.DrawScreenRect(cx-barW/2, cy-8, barW, barH, c)
+		r.DrawScreenRect(cx-barW/2, cy-1, barW, barH, c)
+		r.DrawScreenRect(cx-barW/2, cy+6, barW, barH, c)
 	}
 }

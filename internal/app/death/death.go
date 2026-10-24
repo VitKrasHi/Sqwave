@@ -243,6 +243,8 @@ func (s *Scene) Draw(r game.SceneRenderer) {
 			}
 		}
 
+		game.DrawStatsOverlay(r, s.game.Stats(), sh*0.5)
+
 		hintPulse := uint8(120 + 100*math.Abs(math.Sin(float64(s.timer)*0.06)))
 		hint := color.NRGBA{R: 200, G: 30, B: 30, A: hintPulse}
 		r.DrawScreenTextScaled("PRESS ANY KEY", 20, sh-60, 1.6, hint)

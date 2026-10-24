@@ -36,6 +36,8 @@ type World struct {
 
 	// Музыка: если непустое, Game переключит трек и обнулит.
 	PendingTrack string
+
+	Stats Stats
 }
 
 type MapKind int

@@ -751,6 +751,11 @@ func endWave(w *world.World) {
 	ws.Active = false
 	ws.PauseTimer = wavePauseTicks
 
+	// Учитываем волну.
+	if ws.DefendOutcome != -1 {
+		w.Stats.WavesSurvived++
+	}
+
 	// Сброс текущего модуля.
 	w.Player.ActiveModule = world.ModuleNone
 	w.Player.VulnArmed = false

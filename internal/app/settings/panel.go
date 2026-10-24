@@ -37,7 +37,6 @@ func New(music *audio.Player) *Panel {
 	}
 }
 
-// Update обрабатывает ввод. Возвращает true, если панель нужно закрыть.
 func (p *Panel) Update() bool {
 	if !p.Open {
 		return false
@@ -47,6 +46,46 @@ func (p *Panel) Update() bool {
 		return true
 	}
 
+	// Мышь.
+	mx, my := ebiten.CursorPosition()
+	fx, fy := float64(mx), float64(my)
+
+	// Слайдер — drag.
+	bx, by, bw, bh := volumeBarRect()
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) &&
+		fx >= bx && fx <= bx+bw && fy >= by && fy <= by+bh {
+		ratio := (fx - bx) / bw
+		if ratio < 0 {
+			ratio = 0
+		}
+		if ratio > 1 {
+			ratio = 1
+		}
+		if p.music != nil {
+			p.music.SetVolume(ratio)
+		}
+		p.Selected = SelVolume
+	}
+
+	// Hover по строке Volume.
+	rx, ry, rw, rh := volumeRowRect()
+	if fx >= rx && fx <= rx+rw && fy >= ry && fy <= ry+rh {
+		p.Selected = SelVolume
+	}
+
+	// Hover по Back.
+	cx, cy, cw, ch := backButtonRect()
+	if fx >= cx && fx <= cx+cw && fy >= cy && fy <= cy+ch {
+		p.Selected = SelBack
+	}
+
+	// Клик по Back.
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) &&
+		fx >= cx && fx <= cx+cw && fy >= cy && fy <= cy+ch {
+		return true
+	}
+
+	// Клавиатура.
 	if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) || inpututil.IsKeyJustPressed(ebiten.KeyW) {
 		p.Selected = (p.Selected - 1 + 2) % 2
 	}
@@ -144,9 +183,35 @@ func (p *Panel) Draw(r Renderer) {
 	}
 	r.DrawScreenRect(backX-2, backY-2, backW+4, backH+4, borderBtn)
 	r.DrawScreenRect(backX, backY, backW, backH, bgBtn)
-	r.DrawScreenTextScaled("Back", backX+20, backY+10, 1.6, textBtn)
+	r.DrawScreenTextScaled("Back", backX+20, backY, 1.6, textBtn)
 
 	r.DrawScreenText("UP/DOWN select   LEFT/RIGHT change   Enter confirm   Esc back",
 		px+40, py+panelH-30,
 		color.NRGBA{R: 110, G: 130, B: 160, A: 255})
+}
+
+func panelOrigin() (float64, float64) {
+	sw := float64(world.ScreenWidth)
+	sh := float64(world.ScreenHeight)
+	panelW := 500.0
+	panelH := 320.0
+	return (sw - panelW) / 2, (sh - panelH) / 2
+}
+
+func volumeBarRect() (x, y, w, h float64) {
+	px, py := panelOrigin()
+	return px + 260, py + 123, 160, 14
+}
+
+func volumeRowRect() (x, y, w, h float64) {
+	px, py := panelOrigin()
+	return px + 20, py + 116, 420, 30
+}
+
+func backButtonRect() (x, y, w, h float64) {
+	px, py := panelOrigin()
+	panelW := 500.0
+	backW := 200.0
+	backX := px + (panelW-backW)/2
+	return backX, py + 240, backW, 44
 }

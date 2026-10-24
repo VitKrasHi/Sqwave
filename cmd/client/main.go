@@ -18,6 +18,7 @@ import (
 	"Sqwave/internal/app/game"
 	"Sqwave/internal/app/menu"
 	"Sqwave/internal/app/setup"
+	"Sqwave/internal/app/victory"
 	"Sqwave/internal/domain/systems"
 	"Sqwave/internal/domain/world"
 	"Sqwave/internal/embedassets"
@@ -53,39 +54,42 @@ func (a *App) Layout(_, _ int) (int, int) {
 	return world.ScreenWidth, world.ScreenHeight
 }
 
-func (a *App) openMenu() {
-	a.current = menu.New(
-		a.music,
-		func() { a.openSetup() },
-		func() { os.Exit(0) },
-	)
+func (a *App) openMenu(glitch bool) {
+	m := menu.New(a.music, func() { a.openSetup() }, func() { os.Exit(0) })
+	m.SetGlitchMode(glitch)
+	a.current = m
 }
 
 func (a *App) openSetup() {
 	a.current = setup.New(
 		func(s setup.Settings) { a.startGame(s) },
-		func() { a.openMenu() },
+		func() { a.openMenu(false) },
 	)
 }
 
 func (a *App) startGame(s setup.Settings) {
 	w := world.NewWithOptions(time.Now().UnixNano(), a.mapKind, world.Options{
-		BaseWaveSize: s.EnemiesPerWave,
-		WavesLimit:   s.WavesLimit,
+		WavesLimit: s.WavesLimit,
 	})
 	if a.mapKind != world.MapDefault {
 		systems.StartTestRoom(w, a.mapKind)
 	}
-
 	g := game.New(w, ebiteninput.New(), a.music)
 
 	g.SetOnPlayerDied(func() {
 		a.current = death.New(g, a.music, func() {
-			a.openMenu()
+			a.openMenu(true) // glitch-частицы
 		})
 	})
+
+	g.SetOnVictory(func() {
+		a.current = victory.New(g, a.music, func() {
+			a.openMenu(false) // нормальные частицы
+		})
+	})
+
 	g.SetOnExitToMenu(func() {
-		a.openMenu()
+		a.openMenu(false)
 	})
 
 	a.current = g
@@ -155,7 +159,7 @@ func main() {
 	if *skipMenu {
 		a.startGame(setup.Settings{EnemiesPerWave: 100, WavesLimit: 0})
 	} else {
-		a.openMenu()
+		a.openMenu(false)
 	}
 
 	ebiten.SetWindowSize(world.ScreenWidth, world.ScreenHeight)

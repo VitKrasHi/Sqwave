@@ -222,6 +222,7 @@ func StepEnemies(w *world.World) {
 				value = world.CoinBossBonus
 			}
 			SpawnCoinAt(w, ecx, ecy, value)
+			w.Stats.EnemiesKilled++
 			continue
 		}
 		if e.Type == world.EnemyGhost && deadSummoners[e.OwnerSummonerID] {

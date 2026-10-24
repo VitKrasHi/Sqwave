@@ -8,6 +8,7 @@ import (
 )
 
 func StepPlayer(w *world.World, in input.PlayerInput) {
+	w.Stats.PlaytimeTicks++
 	p := &w.Player
 
 	// --- Прицел ---

@@ -17,6 +17,8 @@ type Particle struct {
 	Phase  float64
 	Speed  float64
 	Color  color.NRGBA
+
+	GlitchTimer int // тиков до следующего телепорта (в glitch-режиме)
 }
 
 var palette = []color.NRGBA{
@@ -33,22 +35,36 @@ func New(minX, maxX, minY, maxY float64, rng *rand.Rand) []Particle {
 	ps := make([]Particle, Count)
 	for i := range ps {
 		ps[i] = Particle{
-			X:     minX + rng.Float64()*(maxX-minX),
-			Y:     minY + rng.Float64()*(maxY-minY),
-			VX:    (rng.Float64()*2 - 1) * 1.2,
-			VY:    (rng.Float64()*2 - 1) * 1.2,
-			Size:  4 + rng.Float64()*6,
-			Phase: rng.Float64() * math.Pi * 2,
-			Speed: 0.04 + rng.Float64()*0.04,
-			Color: palette[rng.Intn(len(palette))],
+			X:           minX + rng.Float64()*(maxX-minX),
+			Y:           minY + rng.Float64()*(maxY-minY),
+			VX:          (rng.Float64()*2 - 1) * 1.2,
+			VY:          (rng.Float64()*2 - 1) * 1.2,
+			Size:        4 + rng.Float64()*6,
+			Phase:       rng.Float64() * math.Pi * 2,
+			Speed:       0.04 + rng.Float64()*0.04,
+			Color:       palette[rng.Intn(len(palette))],
+			GlitchTimer: rng.Intn(12),
 		}
 	}
 	return ps
 }
 
-func Update(ps []Particle, minX, maxX, minY, maxY float64) {
+func Update(ps []Particle, minX, maxX, minY, maxY float64, glitch bool) {
 	for i := range ps {
 		p := &ps[i]
+
+		if glitch {
+			// Дёрганые частицы: стоят на месте, потом телепорт.
+			p.GlitchTimer--
+			if p.GlitchTimer <= 0 {
+				p.X = minX + rand.Float64()*(maxX-minX)
+				p.Y = minY + rand.Float64()*(maxY-minY)
+				p.GlitchTimer = 2 + rand.Intn(12)
+			}
+			continue
+		}
+
+		// Плавное движение.
 		p.X += p.VX
 		p.Y += p.VY
 		p.Phase += p.Speed
@@ -88,7 +104,6 @@ func Draw(r game.SceneRenderer, ps []Particle) {
 			r.DrawScreenLine(ps[i].X, ps[i].Y, ps[j].X, ps[j].Y, 1, line)
 		}
 	}
-
 	for _, p := range ps {
 		pulse := 1.0 + 0.3*math.Sin(p.Phase)
 		s := p.Size * pulse

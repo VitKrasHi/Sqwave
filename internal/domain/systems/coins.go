@@ -25,6 +25,7 @@ func StepCoins(w *world.World) {
 		// Подбор.
 		if d <= world.CoinPickupRadius {
 			p.Coins += c.Value
+			w.Stats.CoinsEarned += c.Value
 			continue
 		}
 
