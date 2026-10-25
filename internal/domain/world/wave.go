@@ -295,11 +295,11 @@ func RandomEnemyTypeForWave(level int, allowSupport bool, rng intRng) EnemyType 
 func TrackForLevel(level int) string {
 	switch level {
 	case 1, 2:
-		return "assets/music/all_systems_go.wav"
+		return "assets/music/all_systems_go.ogg"
 	case 3, 4:
-		return "assets/music/aesthetic_failure.wav"
+		return "assets/music/aesthetic_failure.ogg"
 	case 5:
-		return "assets/music/elfire.wav"
+		return "assets/music/elfire.ogg"
 	}
 	return ""
 }
@@ -320,11 +320,11 @@ var SpawnPoints = []geometry.Point{
 func TimerTrackForLevel(level int) string {
 	switch level {
 	case 1, 2:
-		return "assets/music/experiment_7.wav"
+		return "assets/music/experiment_7.ogg"
 	case 3, 4:
-		return "assets/music/bounce_automation.wav"
+		return "assets/music/bounce_automation.ogg"
 	case 5:
-		return "assets/music/cultivating_madness.wav"
+		return "assets/music/cultivating_madness.ogg"
 	}
 	return ""
 }
@@ -370,11 +370,11 @@ func DefendTrackForLevel(level int) string {
 	switch level {
 	case 1, 2:
 		// Два трека на выбор — 50/50.
-		return "assets/music/necro_syncrosis.wav" // выбор на месте
+		return "assets/music/necro_syncrosis.ogg" // выбор на месте
 	case 3, 4:
-		return "assets/music/twisted.wav"
+		return "assets/music/twisted.ogg"
 	case 5:
-		return "assets/music/dark_subconscious.wav"
+		return "assets/music/dark_subconscious.ogg"
 	}
 	return ""
 }
@@ -415,11 +415,11 @@ func AttackSpawnHPFor(level int) int {
 func AttackTrackForLevel(level int) string {
 	switch level {
 	case 1, 2:
-		return "assets/music/cy2v9.wav"
+		return "assets/music/cy2v9.ogg"
 	case 3, 4:
-		return "assets/music/suck.wav"
+		return "assets/music/suck.ogg"
 	case 5:
-		return "assets/music/pull_the_trigger.wav"
+		return "assets/music/pull_the_trigger.ogg"
 	}
 	return ""
 }

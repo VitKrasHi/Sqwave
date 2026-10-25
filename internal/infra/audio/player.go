@@ -3,9 +3,12 @@ package audio
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 )
 
@@ -16,17 +19,18 @@ type Player struct {
 	current *audio.Player
 	track   string
 	volume  float64
-	fs      fs.FS
+	assets  fs.FS
 }
 
-func New(fsys fs.FS) (*Player, error) {
+func New(assets fs.FS) (*Player, error) {
 	return &Player{
 		ctx:    audio.NewContext(sampleRate),
 		volume: 0.7,
-		fs:     fsys,
+		assets: assets,
 	}, nil
 }
 
+// PlayLoop — играет трек в цикле, если НИЧЕГО не играет.
 func (p *Player) PlayLoop(path string) error {
 	if p.current != nil {
 		return nil
@@ -34,6 +38,7 @@ func (p *Player) PlayLoop(path string) error {
 	return p.playInternal(path)
 }
 
+// PlayLoopForce — принудительно переключает на трек.
 func (p *Player) PlayLoopForce(path string) error {
 	if p.current != nil && p.track == path {
 		return nil
@@ -43,17 +48,32 @@ func (p *Player) PlayLoopForce(path string) error {
 }
 
 func (p *Player) playInternal(path string) error {
-	data, err := fs.ReadFile(p.fs, path)
+	data, err := fs.ReadFile(p.assets, path)
 	if err != nil {
 		return fmt.Errorf("audio: read %s: %w", path, err)
 	}
 
-	stream, err := wav.DecodeWithSampleRate(sampleRate, bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("audio: decode %s: %w", path, err)
+	var src io.ReadSeeker
+	var length int64
+
+	if strings.HasSuffix(path, ".ogg") {
+		s, err := vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("audio: decode %s: %w", path, err)
+		}
+		src = s
+		length = s.Length()
+	} else {
+		s, err := wav.DecodeWithSampleRate(sampleRate, bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("audio: decode %s: %w", path, err)
+		}
+		src = s
+		length = s.Length()
 	}
 
-	loop := audio.NewInfiniteLoop(stream, stream.Length())
+	loop := audio.NewInfiniteLoop(src, length)
+
 	player, err := p.ctx.NewPlayer(loop)
 	if err != nil {
 		return fmt.Errorf("audio: new player: %w", err)

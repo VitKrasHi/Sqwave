@@ -69,7 +69,7 @@ func (m *Menu) buildButtons() {
 
 func (m *Menu) Update() error {
 	if m.music != nil {
-		_ = m.music.PlayLoop("assets/music/nfx.wav")
+		_ = m.music.PlayLoop("assets/music/nfx.ogg")
 	}
 
 	particles.Update(m.ps, panelW+20, float64(world.ScreenWidth)-20,

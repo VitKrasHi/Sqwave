@@ -14,8 +14,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"Sqwave/internal/app"
+	"Sqwave/internal/app/card"
 	"Sqwave/internal/app/death"
 	"Sqwave/internal/app/game"
+	"Sqwave/internal/app/logo"
 	"Sqwave/internal/app/menu"
 	"Sqwave/internal/app/setup"
 	"Sqwave/internal/app/victory"
@@ -100,6 +102,10 @@ func main() {
 	fullscreen := flag.Bool("fullscreen", false, "start in fullscreen")
 	skipMenu := flag.Bool("skip-menu", false, "start directly in game (debug)")
 	profiler := flag.Bool("prof", false, "enable pprof on localhost:6060")
+	cardMode := flag.Bool("card", false, "show game card as splash")
+	genBg := flag.Bool("gen-bg", false, "generate assets/background.png (1920x1080) and exit")
+	genIcon := flag.Bool("gen-icon", false, "generate assets/icon.png (630x500) and exit")
+	genLogo := flag.Bool("gen-logo", false, "generate logo assets (icon + wordmark) and exit")
 	flag.Parse()
 
 	if *profiler {
@@ -154,9 +160,50 @@ func main() {
 		fmt.Println("audio init failed:", err)
 	}
 
+	if *genIcon {
+		if err := card.SaveIcon("assets/icon.png"); err != nil {
+			fmt.Println("icon:", err)
+			os.Exit(1)
+		}
+		fmt.Println("saved assets/icon.png (630x500)")
+		return
+	}
+
+	if *genBg {
+		if err := card.SaveBackground("assets/background.png"); err != nil {
+			fmt.Println("background:", err)
+			os.Exit(1)
+		}
+		fmt.Println("saved assets/background.png (1920x1080)")
+		return
+	}
+
+	if *genLogo {
+		if err := logo.SaveAvatar("assets/avatar.png"); err != nil {
+			fmt.Println("avatar:", err)
+			os.Exit(1)
+		}
+		if err := logo.SaveAvatarSquare("assets/avatar_square.png"); err != nil {
+			fmt.Println("avatar square:", err)
+			os.Exit(1)
+		}
+		if err := logo.SaveWordmark("assets/wordmark.png"); err != nil {
+			fmt.Println("wordmark:", err)
+			os.Exit(1)
+		}
+		fmt.Println("saved assets/logo/avatar.png (512x512)")
+		fmt.Println("saved assets/logo/avatar_square.png (512x512)")
+		fmt.Println("saved assets/logo/wordmark.png (1600x400)")
+		return
+	}
+
 	a := &App{mapKind: kind, music: music, assets: embedassets.FS}
 
-	if *skipMenu {
+	if *cardMode {
+		a.current = card.New(func() {
+			a.openMenu(false)
+		})
+	} else if *skipMenu {
 		a.startGame(setup.Settings{EnemiesPerWave: 100, WavesLimit: 0})
 	} else {
 		a.openMenu(false)

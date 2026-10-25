@@ -30,7 +30,7 @@ const (
 )
 
 const deathImagePath = "assets/images/monster.jpg"
-const deathTrackPath = "assets/music/monster.wav"
+const deathTrackPath = "assets/music/monster.ogg"
 
 const failedText = "FAILED"
 const failedLetterCount = len("FAILED")

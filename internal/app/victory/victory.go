@@ -13,7 +13,7 @@ import (
 )
 
 const fadeTicks = 60
-const victoryTrackPath = "assets/music/nfx.wav"
+const victoryTrackPath = "assets/music/nfx.ogg"
 
 type Scene struct {
 	game   *game.Game
