@@ -186,6 +186,8 @@ func pickRandomSpawnLocation(w *world.World) (float64, float64, bool) {
 
 // StepAttackObjectives — проверяет победу в Attack-волне.
 // Победа: все вражеские спавны уничтожены.
+// StepAttackObjectives — проверяет победу в Attack-волне.
+// Победа: все вражеские спавны уничтожены.
 func StepAttackObjectives(w *world.World) {
 	ws := &w.Wave
 	if ws.Kind != world.WaveKindAttack || !ws.Active {
@@ -195,21 +197,35 @@ func StepAttackObjectives(w *world.World) {
 	alive := 0
 	for i := range w.SpawnPoints {
 		sp := &w.SpawnPoints[i]
-		if sp.Faction == world.SpawnFactionEnemy && !sp.IsDead() {
-			alive++
+		if sp.Faction != world.SpawnFactionEnemy {
+			continue
 		}
+		if sp.IsDead() {
+			// Спавн уничтожен — его защитники погибают.
+			for j := range w.Enemies {
+				e := &w.Enemies[j]
+				if !e.IsDead() && e.OwnerSpawnIdx == i {
+					e.HP = 0
+				}
+			}
+			continue
+		}
+		alive++
 	}
 	ws.AttackSpawnsAlive = alive
 
 	if alive == 0 {
 		ws.AttackOutcome = 1
-		endWave(w)
 
+		// Убиваем всех врагов волны ДО endWave,
+		// чтобы они не остались после очистки спавнов.
 		for i := range w.Enemies {
 			if w.Enemies[i].GroupID > 0 {
 				w.Enemies[i].HP = 0
 			}
 		}
+
+		endWave(w)
 	}
 }
 

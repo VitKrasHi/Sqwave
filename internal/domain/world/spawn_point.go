@@ -16,6 +16,8 @@ type SpawnPoint struct {
 
 	// Faction — кому принадлежит спавн: 0=игрок (Defend), 1=враг (Attack).
 	Faction int
+
+	RespawnTimer int
 }
 
 func (s *SpawnPoint) Rect() geometry.Rect {

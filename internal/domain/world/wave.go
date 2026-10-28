@@ -356,13 +356,13 @@ func DefendSpawnCountFor(level int) int {
 func DefendSpawnHPFor(level int) int {
 	switch level {
 	case 1, 2:
-		return 600
+		return 500
 	case 3, 4:
-		return 900
+		return 500
 	case 5:
-		return 1200
+		return 800
 	}
-	return 600
+	return 800
 }
 
 // DefendTrackForLevel — трек для defend-волны.
@@ -402,13 +402,13 @@ func AttackSpawnCountFor(level int) int {
 func AttackSpawnHPFor(level int) int {
 	switch level {
 	case 1, 2:
-		return 700
+		return 1500
 	case 3, 4:
 		return 1000
 	case 5:
-		return 1400
+		return 800
 	}
-	return 700
+	return 800
 }
 
 // AttackTrackForLevel — трек для attack-волны.
@@ -429,7 +429,19 @@ func AttackGroupIntervalFor(level int) int {
 	return 30 * 60
 }
 
-// AttackGroupSizeRangeFor — диапазон размера группы.
-func AttackGroupSizeRangeFor(level int) (int, int) {
-	return 10, 15
+// AttackGroupSizeRangeFor — диапазон размера группы на ОДИН спавн
+// в зависимости от общего количества живых вражеских спавнов:
+//
+//	3 спавна → 3..5 врагов с каждого
+//	2 спавна → 5..8 врагов с каждого
+//	1 спавн  → 10..15 врагов
+func AttackGroupSizeRangeFor(spawnCount int) (int, int) {
+	switch spawnCount {
+	case 3:
+		return 3, 5
+	case 2:
+		return 5, 8
+	default:
+		return 10, 15
+	}
 }
