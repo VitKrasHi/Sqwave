@@ -129,10 +129,10 @@ var (
 	ColorGhostCore   = color.NRGBA{R: 220, G: 220, B: 255, A: 200}
 	ColorGhostShield = color.NRGBA{R: 220, G: 220, B: 255, A: 180}
 
-	ColorHarpooner    = color.NRGBA{R: 200, G: 170, B: 60, A: 255}
-	ColorHarpoonBody  = color.NRGBA{R: 220, G: 200, B: 120, A: 255}
-	ColorHarpoonChain = color.NRGBA{R: 180, G: 140, B: 60, A: 220}
-	ColorHarpoonAim   = color.NRGBA{R: 255, G: 220, B: 80, A: 120}
+	ColorSpinnerFar    = color.NRGBA{R: 100, G: 120, B: 180, A: 255}
+	ColorSpinnerClose  = color.NRGBA{R: 220, G: 80, B: 60, A: 255}
+	ColorSpinnerAxe    = color.NRGBA{R: 240, G: 220, B: 180, A: 255}
+	ColorSpinnerShield = color.NRGBA{R: 120, G: 180, B: 255, A: 90}
 )
 
 func bulletColor(w world.WeaponType) color.NRGBA {

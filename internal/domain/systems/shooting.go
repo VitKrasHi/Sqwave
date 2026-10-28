@@ -180,7 +180,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 	enemyT := wallT
 	var hitEnemy *world.Enemy
 	var hitTurret *world.Turret
-	var hitHarpoon *world.Harpoon
 	var hitSpawn *world.SpawnPoint
 
 	// Враги.
@@ -194,7 +193,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 				enemyT = t
 				hitEnemy = e
 				hitTurret = nil
-				hitHarpoon = nil
 				hitSpawn = nil
 			}
 		}
@@ -211,24 +209,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 				enemyT = tt
 				hitTurret = t
 				hitEnemy = nil
-				hitHarpoon = nil
-				hitSpawn = nil
-			}
-		}
-	}
-
-	// Зацепленные гарпуны.
-	for i := range w.Harpoons {
-		hp := &w.Harpoons[i]
-		if hp.IsDead() || !hp.Attached {
-			continue
-		}
-		if tt, ok := geometry.RaySegmentIntersectsRect(startX, startY, maxEndX, maxEndY, hp.Rect()); ok {
-			if tt < enemyT {
-				enemyT = tt
-				hitHarpoon = hp
-				hitEnemy = nil
-				hitTurret = nil
 				hitSpawn = nil
 			}
 		}
@@ -246,7 +226,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 				hitSpawn = sp
 				hitEnemy = nil
 				hitTurret = nil
-				hitHarpoon = nil
 			}
 		}
 	}
@@ -262,16 +241,6 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 		}
 	} else if hitTurret != nil {
 		// Турели неуязвимы до конца волны.
-	} else if hitHarpoon != nil {
-		dmg := w.Player.Weapon.DamageAt(0, 1)
-		hitHarpoon.Damage(dmg)
-		if hitHarpoon.IsDead() {
-			p := &w.Player
-			if p.Harpooned && p.HarpoonID == hitHarpoon.ID {
-				p.Harpooned = false
-				p.HarpoonID = -1
-			}
-		}
 	} else if hitSpawn != nil {
 		if !SpawnIsProtected(w, hitSpawn) {
 			distance := enemyT * weapon.Range
@@ -292,7 +261,7 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 		Weapon:  w.Player.Weapon,
 	})
 
-	return hitEnemy != nil || hitTurret != nil || hitHarpoon != nil || hitSpawn != nil
+	return hitEnemy != nil || hitTurret != nil || hitSpawn != nil
 }
 
 // applyMeleeHit проверяет текущее положение клинка против врагов,

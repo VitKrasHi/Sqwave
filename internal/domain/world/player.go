@@ -55,9 +55,10 @@ type Player struct {
 	BurnTimer int // оставшиеся тики горения
 	BurnTick  int // накопитель до следующего тика урона
 
-	// Гарпун.
-	Harpooned bool
-	HarpoonID int // ID гарпуна, к которому притянут (-1 если нет)
+	// Отбрасывание от ударов.
+	KnockbackVX    float64
+	KnockbackVY    float64
+	KnockbackTimer int
 
 	IsFiring bool
 

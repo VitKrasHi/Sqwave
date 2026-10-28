@@ -249,7 +249,6 @@ func (g *Game) Update() error {
 	systems.StepEnemyRockets(g.world)
 	systems.StepTurrets(g.world)
 	systems.StepBurning(g.world)
-	systems.StepHarpoons(g.world)
 	systems.StepCoins(g.world)
 
 	cx, cy := g.world.Player.Center()
@@ -345,36 +344,6 @@ func (g *Game) Draw(r SceneRenderer) {
 			r.DrawLine(tailX, tailY, rk.X, rk.Y, 3, ColorEnemyRocketTrail)
 		}
 		r.DrawRect(rk.X-rk.Size/2, rk.Y-rk.Size/2, rk.Size, rk.Size, ColorEnemyRocket)
-	}
-
-	for _, hp := range w.Harpoons {
-		if hp.IsDead() {
-			continue
-		}
-
-		// След за гарпуном — от позиции минус скорость × N.
-		if !hp.Attached {
-			trailLen := 30.0
-			speed := math.Hypot(hp.VX, hp.VY)
-			if speed > 0.01 {
-				tx := hp.X - hp.VX/speed*trailLen
-				ty := hp.Y - hp.VY/speed*trailLen
-				r.DrawLine(tx, ty, hp.X, hp.Y, 3, ColorHarpoonChain)
-			}
-		}
-
-		// Тело наконечника.
-		r.DrawRect(hp.X-hp.Size/2, hp.Y-hp.Size/2, hp.Size, hp.Size, ColorHarpoonBody)
-
-		// Верёвка от гарпуна к владельцу (по UID).
-		for i := range w.Enemies {
-			owner := &w.Enemies[i]
-			if owner.UniqueID == hp.OwnerUID && !owner.IsDead() {
-				ox, oy := owner.Center()
-				r.DrawLine(hp.X, hp.Y, ox, oy, 2, ColorHarpoonChain)
-				break
-			}
-		}
 	}
 
 	if g.debugNav {
@@ -480,11 +449,6 @@ func (g *Game) Draw(r SceneRenderer) {
 	if w.Player.IsBurning() {
 		r.DrawScreenTextScaled("BURNING", 8, 80, 1.4,
 			color.NRGBA{R: 255, G: 120, B: 40, A: 255})
-	}
-	if w.Player.Harpooned {
-		r.DrawScreenTextScaled("HARPOONED - SHOOT THE CHAIN",
-			8, float64(world.ScreenHeight)-120, 1.4,
-			color.NRGBA{R: 255, G: 200, B: 60, A: 255})
 	}
 
 	if w.Player.ActiveModule != world.ModuleNone {
@@ -791,8 +755,12 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 			c = ColorSummoner
 		case world.EnemyGhost:
 			c = ColorGhost
-		case world.EnemyHarpooner:
-			c = ColorHarpooner
+		case world.EnemySpinner:
+			if e.FarInvulnerable {
+				c = ColorSpinnerFar
+			} else {
+				c = ColorSpinnerClose
+			}
 		default:
 			c = ColorEnemy
 		}
@@ -918,13 +886,28 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 				3, ColorGhostShield)
 		}
 
-		if e.Type == world.EnemyHarpooner && e.HarpoonAiming {
+		if e.Type == world.EnemySpinner {
 			cx, cy := e.Center()
-			progress := 1.0 - float64(e.HarpoonAimTimer)/float64(e.Type.Stats().HarpoonAimTime)
-			alpha := uint8(40 + 120*progress)
-			cAim := ColorHarpoonAim
-			cAim.A = alpha
-			r.DrawLine(cx, cy, e.HarpoonAimTargetX, e.HarpoonAimTargetY, 1.5, cAim)
+
+			// Щит в дальнем режиме.
+			if e.FarInvulnerable {
+				ring := ColorSpinnerShield
+				pulse := 0.9 + 0.1*math.Sin(float64(e.AITimer)*0.15)
+				r.DrawCircle(cx, cy, stats.Size*0.9*pulse, ring)
+			}
+
+			// Проворот топора.
+			if e.SpinActive && stats.SpinDuration > 0 {
+				progress := float64(e.SpinTimer) / float64(stats.SpinDuration)
+				angle := progress * 2 * math.Pi
+
+				for k := 0; k < 2; k++ {
+					a := angle + float64(k)*math.Pi
+					ex := cx + math.Cos(a)*stats.MeleeRange
+					ey := cy + math.Sin(a)*stats.MeleeRange
+					r.DrawLine(cx, cy, ex, ey, 5, ColorSpinnerAxe)
+				}
+			}
 		}
 
 		if e.StunTimer > 0 {

@@ -21,7 +21,7 @@ const (
 	EnemyMachineGunner
 	EnemySummoner
 	EnemyGhost
-	EnemyHarpooner
+	EnemySpinner
 )
 
 type EnemyStats struct {
@@ -144,15 +144,13 @@ type EnemyStats struct {
 	GhostContactRange  float64
 	GhostContactCool   int
 
-	// Гарпунист.
-	HarpoonAimTime    int
-	HarpoonSpeed      float64
-	HarpoonSize       float64
-	HarpoonLife       int
-	HarpoonHP         int
-	HarpoonPullSpeed  float64
-	HarpoonCooldown   int
-	HarpoonAttachDist float64
+	// Спиннер.
+	CloseSpeedMul  float64 // множитель скорости в ближнем режиме
+	FarRange       float64 // за этой дистанцией неуязвим
+	SpinDuration   int     // длительность проворота топора
+	SpinCooldown   int     // тиков между сериями
+	KnockbackForce float64 // сила отбрасывания игрока
+	KnockbackTicks int     // длительность отбрасывания
 }
 
 var enemyStats = map[EnemyType]EnemyStats{
@@ -411,25 +409,23 @@ var enemyStats = map[EnemyType]EnemyStats{
 		GhostContactRange:  40,
 		GhostContactCool:   45, // 0.75 сек между ударами
 	},
-	EnemyHarpooner: {
-		Name:         "Harpooner",
-		MaxHP:        200,
-		SP:           150,
-		Size:         24,
-		PreferredMin: 350,
-		PreferredMax: 700,
+	EnemySpinner: {
+		Name:   "Spinner",
+		MaxHP:  200,
+		SP:     100,
+		Damage: 30,
+		Size:   24,
 
-		WeaponTurnRate:   0.04,
-		WeaponArcDegrees: 15,
+		MeleeRange: 80,
+		FarRange:   400,
 
-		HarpoonAimTime:    90, // 1.5 сек выцеливает
-		HarpoonSpeed:      15, // быстро летит
-		HarpoonSize:       12,
-		HarpoonLife:       240,
-		HarpoonHP:         30,  // чтобы отстрелить
-		HarpoonPullSpeed:  1.2, // насколько быстро тянет игрока
-		HarpoonCooldown:   240, // 4 сек после промаха/разрыва
-		HarpoonAttachDist: 22,  // на каком расстоянии от игрока висит гарпун
+		CloseSpeedMul: 2.0,
+
+		SpinDuration: 20,
+		SpinCooldown: 90,
+
+		KnockbackForce: 6.0,
+		KnockbackTicks: 12,
 	},
 }
 
@@ -599,12 +595,11 @@ type Enemy struct {
 	// Призрак.
 	OwnerSummonerID int // к какому призывателю принадлежит
 
-	// Гарпунист.
-	HarpoonAiming     bool
-	HarpoonAimTimer   int
-	HarpoonCooldown   int
-	HarpoonAimTargetX float64
-	HarpoonAimTargetY float64
+	// Спиннер.
+	FarInvulnerable bool
+	SpinActive      bool
+	SpinTimer       int
+	SpinHit         bool
 	// Уникальный идентификатор врага (не меняется при удалении соседей).
 	UniqueID int
 

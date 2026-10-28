@@ -203,8 +203,8 @@ func spawnOneTimerGroupMember(w *world.World) {
 		ws.Composition.MachineGunner++
 	case world.EnemySummoner:
 		ws.Composition.Summoner++
-	case world.EnemyHarpooner:
-		ws.Composition.Harpooner++
+	case world.EnemySpinner:
+		ws.Composition.Spinner++
 	}
 
 	ws.GroupRemaining--
@@ -417,8 +417,8 @@ func spawnOneFromGroup(w *world.World) {
 		ws.Composition.MachineGunner++
 	case world.EnemySummoner:
 		ws.Composition.Summoner++
-	case world.EnemyHarpooner:
-		ws.Composition.Harpooner++
+	case world.EnemySpinner:
+		ws.Composition.Spinner++
 	}
 
 	ws.GroupRemaining--
@@ -560,8 +560,8 @@ func StartTestRoom(w *world.World, kind world.MapKind) {
 		t = world.EnemyMachineGunner
 	case world.MapTestSummoner:
 		t = world.EnemySummoner
-	case world.MapTestHarpooner:
-		t = world.EnemyHarpooner
+	case world.MapTestSpinner:
+		t = world.EnemySpinner
 	default:
 		return
 	}
@@ -786,8 +786,8 @@ func spawnAttackGroups(w *world.World) {
 				ws.Composition.MachineGunner++
 			case world.EnemySummoner:
 				ws.Composition.Summoner++
-			case world.EnemyHarpooner:
-				ws.Composition.Harpooner++
+			case world.EnemySpinner:
+				ws.Composition.Spinner++
 			}
 
 			ws.SpawnedCount++
@@ -834,31 +834,4 @@ func endWave(w *world.World) {
 		w.Player.ActiveModule = pool[w.Rng.Intn(len(pool))]
 		w.Player.ModuleAnnounce = 180 // 3 сек анонса
 	}
-}
-
-func spawnDefender(w *world.World, spawnIdx int) {
-	ws := &w.Wave
-	sp := &w.SpawnPoints[spawnIdx]
-
-	t := pickWaveEnemy(w, ws)
-
-	pos, ok := findFreeSpotNear(w, sp.X, sp.Y, 140)
-	if !ok {
-		return
-	}
-
-	e := world.NewEnemy(t, pos.X, pos.Y)
-	e.GroupID = ws.GroupID
-	e.OwnerSpawnIdx = spawnIdx
-	e.OriginalTargetSpawn = -1
-	e.TargetSpawnIdx = -1
-	w.Enemies = append(w.Enemies, e)
-
-	if world.IsSupportType(t) {
-		ws.WaveSupports++
-	}
-	if t == world.EnemySniper {
-		ws.WaveSnipers++
-	}
-	ws.SpawnedCount++
 }

@@ -11,6 +11,11 @@ func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
 		return
 	}
 
+	// Спиннер в дальнем режиме неуязвим.
+	if e.Type == world.EnemySpinner && e.FarInvulnerable {
+		return
+	}
+
 	w.Stats.DamageDealt += dmg
 
 	p := &w.Player

@@ -16,7 +16,6 @@ type World struct {
 	Explosions         []Explosion
 	EnemyProjectiles   []EnemyProjectile
 	EnemyRockets       []EnemyRocket
-	Harpoons           []Harpoon
 	Turrets            []Turret
 	Walls              []geometry.Rect
 	SpawnPoints        []SpawnPoint
@@ -31,7 +30,6 @@ type World struct {
 
 	// Уникальные ID.
 	NextEnemyUID   int
-	NextHarpoonID  int
 	NextSummonerID int
 
 	// Музыка: если непустое, Game переключит трек и обнулит.
@@ -59,7 +57,7 @@ const (
 	MapTestTank
 	MapTestMachineGunner
 	MapTestSummoner
-	MapTestHarpooner
+	MapTestSpinner
 )
 
 type Options struct {
@@ -107,7 +105,6 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
 			HeldBy:    -1,
-			HarpoonID: -1,
 		},
 		Walls: wallsForMap(kind),
 		SpawnZone: geometry.Rect{
@@ -126,7 +123,7 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic,
 		MapTestRammer, MapTestSniper, MapTestRocketeer, MapTestBuffer,
 		MapTestFleer, MapTestEngineer, MapTestFlamer, MapTestProtector,
-		MapTestTank, MapTestMachineGunner, MapTestSummoner, MapTestHarpooner:
+		MapTestTank, MapTestMachineGunner, MapTestSummoner, MapTestSpinner:
 		w.Wave = WaveState{}
 	default:
 		w.Wave = WaveState{
@@ -142,11 +139,6 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 func (w *World) AllocEnemyUID() int {
 	w.NextEnemyUID++
 	return w.NextEnemyUID
-}
-
-func (w *World) AllocHarpoonID() int {
-	w.NextHarpoonID++
-	return w.NextHarpoonID
 }
 
 func (w *World) AllocSummonerID() int {
@@ -175,7 +167,7 @@ func wallsForMap(kind MapKind) []geometry.Rect {
 	case MapTestInfantry, MapTestShooter, MapTestScout, MapTestMedic,
 		MapTestRammer, MapTestSniper, MapTestRocketeer, MapTestBuffer,
 		MapTestFleer, MapTestEngineer, MapTestFlamer, MapTestProtector,
-		MapTestTank, MapTestMachineGunner, MapTestSummoner, MapTestHarpooner:
+		MapTestTank, MapTestMachineGunner, MapTestSummoner, MapTestSpinner:
 		return testRoomWalls()
 	default:
 		return defaultWalls()

@@ -73,6 +73,9 @@ const (
 	MedicAllyRadius        = 900.0 // было 320 — теперь видит почти всю карту
 	MedicPlayerFleeRange   = 140.0
 
+	// Спиннер.
+	SpinnerFarRange = 400.0
+
 	// Цена полного отхила в меню спавна.
 	FullHPPrice = 25
 

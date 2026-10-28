@@ -33,14 +33,14 @@ type WaveComposition struct {
 	Tank          int
 	MachineGunner int
 	Summoner      int
-	Harpooner     int
+	Spinner       int
 }
 
 func (c WaveComposition) Total() int {
 	return c.Infantry + c.Shooter + c.Scout + c.Medic +
 		c.Rammer + c.Sniper + c.Rocketeer + c.Buffer +
 		c.Fleer + c.Engineer + c.Flamer + c.Protector +
-		c.Tank + c.MachineGunner + c.Summoner + c.Harpooner
+		c.Tank + c.MachineGunner + c.Summoner + c.Spinner
 }
 
 type WaveState struct {
@@ -197,7 +197,7 @@ var enemyByLevelAndCategory = map[int]map[enemyCategory][]EnemyType{
 		CatSupport:  {EnemyBuffer},
 	},
 	3: {
-		CatMelee:    {EnemyHarpooner},
+		CatMelee:    {EnemySpinner},
 		CatRanged:   {EnemySniper},
 		CatObstacle: {EnemyEngineer},
 		CatSupport:  {EnemyProtector},

@@ -51,37 +51,34 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 			p.HeldBy = -1
 		}
 	}
-	if p.Harpooned && p.HarpoonID != -1 {
-		valid := false
-		for i := range w.Harpoons {
-			if w.Harpoons[i].ID == p.HarpoonID && !w.Harpoons[i].IsDead() {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			p.Harpooned = false
-			p.HarpoonID = -1
-		}
-	}
 
 	// --- Обездвиживание ---
 	if p.DashActive {
 		p.Held = false
 		p.HeldBy = -1
-		p.Harpooned = false
-		p.HarpoonID = -1
 		for i := range w.Enemies {
 			if w.Enemies[i].Latched {
 				w.Enemies[i].Latched = false
 			}
 		}
-	} else if p.Held || p.Harpooned {
+	} else if p.Held {
 		p.DashActive = false
 		p.DashActiveTimer = 0
 		p.DashChargeTicks = 0
 		p.VelX = 0
 		p.VelY = 0
+		p.PrevX = p.X
+		p.PrevY = p.Y
+		return
+	} else if p.KnockbackTimer > 0 {
+		p.KnockbackTimer--
+		oldX, oldY := p.X, p.Y
+		moveX(w, p.KnockbackVX)
+		moveY(w, p.KnockbackVY)
+		p.KnockbackVX *= 0.85
+		p.KnockbackVY *= 0.85
+		p.VelX = p.X - oldX
+		p.VelY = p.Y - oldY
 		p.PrevX = p.X
 		p.PrevY = p.Y
 		return

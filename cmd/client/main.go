@@ -149,8 +149,8 @@ func main() {
 		kind = world.MapTestMachineGunner
 	case "summoner":
 		kind = world.MapTestSummoner
-	case "harpooner":
-		kind = world.MapTestHarpooner
+	case "spinner":
+		kind = world.MapTestSpinner
 	default:
 		fmt.Printf("unknown map %q, using default\n", *mapName)
 	}

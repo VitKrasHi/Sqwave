@@ -168,8 +168,8 @@ func StepEnemies(w *world.World) {
 			stepSummoner(w, e, ecx, ecy, pcx, pcy, dist)
 		case world.EnemyGhost:
 			stepGhost(w, e, ecx, ecy, pcx, pcy, dist)
-		case world.EnemyHarpooner:
-			stepHarpooner(w, e, ecx, ecy, pcx, pcy, dist)
+		case world.EnemySpinner:
+			stepSpinner(w, e, ecx, ecy, pcx, pcy, dist)
 		}
 	}
 

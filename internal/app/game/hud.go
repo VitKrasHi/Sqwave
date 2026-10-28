@@ -62,8 +62,8 @@ func drawWavePanel(r SceneRenderer, w *world.World) {
 	if comp.Summoner > 0 {
 		lines = append(lines, line{"Summoner", comp.Summoner, ColorSummoner})
 	}
-	if comp.Harpooner > 0 {
-		lines = append(lines, line{"Harpooner", comp.Harpooner, ColorHarpooner})
+	if comp.Spinner > 0 {
+		lines = append(lines, line{"Spinner", comp.Spinner, ColorSpinnerClose})
 	}
 
 	const (
