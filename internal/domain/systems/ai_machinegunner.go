@@ -8,7 +8,7 @@ import (
 
 func stepMachineGunner(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	// --- Поворот оружия к предсказанной позиции игрока ---
 	leadTime := dist / stats.ProjectileSpeed
@@ -176,7 +176,7 @@ func mgDamageForDist(stats world.EnemyStats, dist float64) int {
 
 func fireMGRound(w *world.World, e *world.Enemy, ecx, ecy float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	pcx, pcy := p.Center()
 	dist := math.Hypot(pcx-ecx, pcy-ecy)

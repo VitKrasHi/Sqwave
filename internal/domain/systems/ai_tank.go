@@ -22,7 +22,7 @@ func BlocksDamageFrom(e *world.Enemy, fromX, fromY float64) bool {
 
 func stepTank(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	if e.HammerCooldown > 0 {
 		e.HammerCooldown--

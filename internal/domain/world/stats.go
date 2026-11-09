@@ -5,5 +5,6 @@ type Stats struct {
 	EnemiesKilled int
 	WavesSurvived int
 	CoinsEarned   int
+	Revives       int
 	PlaytimeTicks int
 }

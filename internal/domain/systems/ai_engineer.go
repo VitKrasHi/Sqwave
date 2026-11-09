@@ -160,7 +160,7 @@ func placeTurretAt(w *world.World, e *world.Enemy, tx, ty float64) {
 // stepEngineerCombat — обычное поведение после установки турели.
 func stepEngineerCombat(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	// Стрельба дробью.
 	if e.AttackTimer > 0 {

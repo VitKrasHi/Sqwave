@@ -7,17 +7,8 @@ import (
 )
 
 func StepTurrets(w *world.World) {
-	p := &w.Player
-	pcx, pcy := p.Center()
-
 	for i := range w.Turrets {
 		t := &w.Turrets[i]
-		if i == 0 {
-			println("turret: cd=", t.Cooldown, "cdmax=", t.CooldownMax,
-				"burst=", t.ShotsInBurst, "burstsize=", t.BurstSize,
-				"dist=", int(math.Hypot(pcx-t.X, pcy-t.Y)),
-				"detect=", int(t.DetectRange))
-		}
 		if t.IsDead() {
 			continue
 		}
@@ -32,10 +23,12 @@ func StepTurrets(w *world.World) {
 			continue
 		}
 
-		// Проверяем цель.
-		if p.IsDead() {
+		// Проверяем цель — ближайший живой игрок.
+		tgt := w.NearestPlayer(t.X, t.Y)
+		if tgt == nil || tgt.IsDead() {
 			continue
 		}
+		pcx, pcy := tgt.Center()
 		dist := math.Hypot(pcx-t.X, pcy-t.Y)
 		if dist > t.DetectRange {
 			continue

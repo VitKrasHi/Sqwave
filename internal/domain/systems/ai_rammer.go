@@ -55,9 +55,10 @@ func stepRammer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64
 			wallHit = true
 		}
 
-		if !e.DashHit && rammerHitsPlayer(e, &w.Player) {
+		tgt := w.NearestPlayer(e.X, e.Y)
+		if !e.DashHit && rammerHitsPlayer(e, tgt) {
 			dmg := int(float64(stats.DashDamage) * e.DamageMul())
-			TryMeleeDamage(w, e, dmg)
+			TryMeleeDamage(w, tgt, e, dmg)
 			e.DashHit = true
 		}
 

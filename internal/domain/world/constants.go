@@ -79,6 +79,12 @@ const (
 	// Цена полного отхила в меню спавна.
 	FullHPPrice = 25
 
+	// Цена воскрешения одного павшего напарника в меню спавна.
+	RevivePricePerPlayer = 25
+
+	// Неуязвимость после воскрешения (2 сек при 60 TPS).
+	ReviveIFrames = 120
+
 	// Модуль Vulnerability.
 	VulnMarkTicks  = 5 * 60 // 5 сек
 	VulnDamageMul  = 4

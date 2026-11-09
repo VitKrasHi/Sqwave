@@ -155,7 +155,7 @@ func pickRandomSpawnLocation(w *world.World) (float64, float64, bool) {
 	const minDistBetween = 500.0
 	const margin = 200.0
 
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.PlayersCenter()
 
 	for attempt := 0; attempt < 40; attempt++ {
 		x := margin + w.Rng.Float64()*(world.WorldWidth-2*margin)
@@ -233,7 +233,7 @@ func StepAttackObjectives(w *world.World) {
 func spawnEnemySpawnsForWave(w *world.World, count int, hp int) {
 	w.SpawnPoints = w.SpawnPoints[:0]
 
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.PlayersCenter()
 
 	for i := 0; i < count; i++ {
 		x, y, ok := pickEnemySpawnLocation(w, pcx, pcy)

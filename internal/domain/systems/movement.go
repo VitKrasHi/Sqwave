@@ -7,9 +7,11 @@ import (
 	"Sqwave/internal/domain/world"
 )
 
-func StepPlayer(w *world.World, in input.PlayerInput) {
-	w.Stats.PlaytimeTicks++
-	p := &w.Player
+func StepPlayer(w *world.World, idx int, in input.PlayerInput) {
+	if idx < 0 || idx >= len(w.Players) {
+		return
+	}
+	p := &w.Players[idx]
 
 	// --- Прицел ---
 	if p.HasPrevAim {
@@ -35,6 +37,9 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	}
 	if p.MeleeIFrames > 0 {
 		p.MeleeIFrames--
+	}
+	if p.SpawnIFrames > 0 {
+		p.SpawnIFrames--
 	}
 
 	// --- Захват/гарпун ---
@@ -73,8 +78,8 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 	} else if p.KnockbackTimer > 0 {
 		p.KnockbackTimer--
 		oldX, oldY := p.X, p.Y
-		moveX(w, p.KnockbackVX)
-		moveY(w, p.KnockbackVY)
+		moveX(w, p, p.KnockbackVX)
+		moveY(w, p, p.KnockbackVY)
 		p.KnockbackVX *= 0.85
 		p.KnockbackVY *= 0.85
 		p.VelX = p.X - oldX
@@ -91,8 +96,8 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 
 	// --- Активный щит-рывок ---
 	if p.DashActive {
-		blocked := moveX(w, p.DashActiveDirX*p.DashActiveSpeed)
-		if moveY(w, p.DashActiveDirY*p.DashActiveSpeed) {
+		blocked := moveX(w, p, p.DashActiveDirX*p.DashActiveSpeed)
+		if moveY(w, p, p.DashActiveDirY*p.DashActiveSpeed) {
 			blocked = true
 		}
 		taranCollisions(w, p)
@@ -150,8 +155,8 @@ func StepPlayer(w *world.World, in input.PlayerInput) {
 		speed = p.AimSpeed()
 	}
 
-	moveX(w, dx*speed)
-	moveY(w, dy*speed)
+	moveX(w, p, dx*speed)
+	moveY(w, p, dy*speed)
 
 	p.VelX = p.X - p.PrevX
 	p.VelY = p.Y - p.PrevY
@@ -214,11 +219,10 @@ func taranCollisions(w *world.World, p *world.Player) {
 
 // ==================== Движение с коллизиями ====================
 
-func moveX(w *world.World, dx float64) bool {
+func moveX(w *world.World, p *world.Player, dx float64) bool {
 	if dx == 0 {
 		return false
 	}
-	p := &w.Player
 	targetX := p.X + dx
 	blocked := false
 
@@ -257,11 +261,10 @@ func moveX(w *world.World, dx float64) bool {
 	return blocked
 }
 
-func moveY(w *world.World, dy float64) bool {
+func moveY(w *world.World, p *world.Player, dy float64) bool {
 	if dy == 0 {
 		return false
 	}
-	p := &w.Player
 	targetY := p.Y + dy
 	blocked := false
 

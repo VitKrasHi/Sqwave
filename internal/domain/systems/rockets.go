@@ -81,6 +81,10 @@ func StepRockets(w *world.World) {
 
 		// --- Взрыв ---
 		weapon := r.Weapon.Stats()
+		var owner *world.Player
+		if r.Owner >= 0 && r.Owner < len(w.Players) {
+			owner = &w.Players[r.Owner]
+		}
 
 		// Прямое попадание во врага.
 		if directHit != nil {
@@ -89,7 +93,7 @@ func StepRockets(w *world.World) {
 				if r.DamageOverride > 0 {
 					dmg = r.DamageOverride
 				}
-				DealDamageToEnemy(w, directHit, dmg)
+				DealDamageToEnemy(w, owner, directHit, dmg)
 			}
 		}
 
@@ -99,7 +103,7 @@ func StepRockets(w *world.World) {
 		}
 
 		// AoE-урон по всем в радиусе (кроме прямого получателя).
-		applyExplosionDamage(w, r.X, r.Y, r.ExplosionRadius,
+		applyExplosionDamage(w, owner, r.X, r.Y, r.ExplosionRadius,
 			weapon.ExplosionDamage, directHit)
 
 		spawnExplosion(w, r.X, r.Y, r.ExplosionRadius, r.ExplosionLife)
@@ -110,7 +114,7 @@ func StepRockets(w *world.World) {
 
 // applyExplosionDamage бьёт всех врагов, турели и вражеские спавны
 // в радиусе, кроме того, кто получил прямое попадание.
-func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, exclude *world.Enemy) {
+func applyExplosionDamage(w *world.World, owner *world.Player, x, y, radius float64, damage int, exclude *world.Enemy) {
 	if damage <= 0 {
 		return
 	}
@@ -128,7 +132,7 @@ func applyExplosionDamage(w *world.World, x, y, radius float64, damage int, excl
 		}
 		cx, cy := e.Center()
 		if math.Hypot(cx-x, cy-y) <= radius {
-			DealDamageToEnemy(w, e, damage)
+			DealDamageToEnemy(w, owner, e, damage)
 		}
 	}
 

@@ -12,12 +12,15 @@ import (
 // происходит только по истечении LifeTime, при ударе о стену
 // или при выходе за границы мира. Урон наносится только взрывом.
 func StepEnemyRockets(w *world.World) {
-	p := &w.Player
-	pcx, pcy := p.Center()
-
 	alive := w.EnemyRockets[:0]
 
 	for _, r := range w.EnemyRockets {
+		// Цель — ближайший к ракете живой игрок.
+		tgt := w.NearestPlayer(r.X, r.Y)
+		pcx, pcy := r.X, r.Y
+		if tgt != nil {
+			pcx, pcy = tgt.Center()
+		}
 		// Наведение.
 		speed := math.Hypot(r.VX, r.VY)
 		if speed > 0.01 {
@@ -64,14 +67,19 @@ func StepEnemyRockets(w *world.World) {
 		}
 
 		// --- Взрыв ---
-		// Урон наносится только взрывом, если игрок в радиусе.
-		if !p.IsDead() {
+		// Урон наносится только взрывом: все игроки в радиусе.
+		mul := r.ExplosionDamageMul
+		if mul <= 0 {
+			mul = 1
+		}
+		dmg := int(float64(r.ExplosionDamage) * mul)
+		for i := range w.Players {
+			p := &w.Players[i]
+			if p.IsDead() {
+				continue
+			}
+			pcx, pcy := p.Center()
 			if math.Hypot(pcx-r.X, pcy-r.Y) <= r.ExplosionRadius {
-				mul := r.ExplosionDamageMul
-				if mul <= 0 {
-					mul = 1
-				}
-				dmg := int(float64(r.ExplosionDamage) * mul)
 				p.TakeDamage(dmg)
 			}
 		}

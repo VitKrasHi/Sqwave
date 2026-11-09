@@ -425,7 +425,7 @@ func spawnOneFromGroup(w *world.World) {
 	ws.SpawnedCount++
 }
 func pickGroupOrigin(w *world.World) (float64, float64) {
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.PlayersCenter()
 
 	bestX, bestY := 0.0, 0.0
 	bestScore := math.Inf(-1)
@@ -493,7 +493,7 @@ func spawnPointFree(w *world.World, x, y float64) bool {
 			return false
 		}
 	}
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.PlayersCenter()
 	dx := pcx - x
 	dy := pcy - y
 	if dx*dx+dy*dy < minDist*minDist {
@@ -613,9 +613,10 @@ func spawnPenaltyGroup(w *world.World, count int) {
 	ws := &w.Wave
 	for i := 0; i < count; i++ {
 		t := pickWaveEnemy(w, ws)
+		pcx, pcy := w.PlayersCenter()
 		pos, ok := findFreeSpotNear(w,
-			w.Player.X+w.Rng.Float64()*800-400,
-			w.Player.Y+w.Rng.Float64()*800-400,
+			pcx-w.Rng.Float64()*800-400,
+			pcy-w.Rng.Float64()*800-400,
 			200)
 		if !ok {
 			continue
@@ -813,15 +814,23 @@ func endWave(w *world.World) {
 		w.Stats.WavesSurvived++
 	}
 
-	// Сброс текущего модуля.
-	w.Player.ActiveModule = world.ModuleNone
-	w.Player.VulnArmed = false
-	w.Player.VulnTimer = 0
-	w.Player.RoFStacks = 0
+	// Сброс текущего модуля у всех игроков.
+	for i := range w.Players {
+		p := &w.Players[i]
+		p.ActiveModule = world.ModuleNone
+		p.VulnArmed = false
+		p.VulnTimer = 0
+		p.RoFStacks = 0
+	}
 
 	// Проигрыш в Defend — модуль не выдаём.
 	if ws.DefendOutcome == -1 {
 		return
+	}
+
+	// Кооп: дошедшие до конца волны поднимают павших напарников.
+	if len(w.Players) > 1 {
+		w.ReviveDead()
 	}
 
 	// Шанс 30% получить случайный модуль на следующую волну.
@@ -831,7 +840,10 @@ func endWave(w *world.World) {
 			world.ModuleVulnerability,
 			world.ModuleRateOfFire,
 		}
-		w.Player.ActiveModule = pool[w.Rng.Intn(len(pool))]
-		w.Player.ModuleAnnounce = 180 // 3 сек анонса
+		for i := range w.Players {
+			p := &w.Players[i]
+			p.ActiveModule = pool[w.Rng.Intn(len(pool))]
+			p.ModuleAnnounce = 180 // 3 сек анонса
+		}
 	}
 }

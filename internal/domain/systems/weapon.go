@@ -8,13 +8,15 @@ import (
 // StepWeaponSelection обрабатывает только смену активного слота (Q).
 // Выбор оружия через меню (E в зоне спавна) живёт в app-слое,
 // потому что он доступен только в зоне спавна и только при открытом меню.
-func StepWeaponSelection(w *world.World, in input.PlayerInput) {
-	if in.SwapWeapon {
-		before := w.Player.Weapon
-		w.Player.SwapWeapon()
-		if w.Player.Weapon != before {
-			resetWeaponState(&w.Player)
-		}
+func StepWeaponSelection(w *world.World, idx int, in input.PlayerInput) {
+	if !in.SwapWeapon || idx < 0 || idx >= len(w.Players) {
+		return
+	}
+	p := &w.Players[idx]
+	before := p.Weapon
+	p.SwapWeapon()
+	if p.Weapon != before {
+		resetWeaponState(p)
 	}
 }
 

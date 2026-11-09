@@ -11,6 +11,10 @@ var (
 	ColorWall       = color.NRGBA{R: 90, G: 90, B: 90, A: 255}
 	ColorPlayer     = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 	ColorPlayerDash = color.NRGBA{R: 180, G: 220, B: 255, A: 255}
+	// Напарник по кооперативу.
+	ColorPlayerRemote = color.NRGBA{R: 120, G: 200, B: 255, A: 255}
+	// Мёртвый игрок.
+	ColorPlayerDead = color.NRGBA{R: 90, G: 90, B: 100, A: 255}
 	ColorAim        = color.NRGBA{R: 0, G: 255, B: 0, A: 255}
 
 	ColorPistolBullet = color.NRGBA{R: 255, G: 220, B: 60, A: 255}

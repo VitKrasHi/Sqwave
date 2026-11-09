@@ -73,6 +73,9 @@ type Player struct {
 	// i-frames после попадания мечом.
 	MeleeIFrames int
 
+	// Неуязвимость сразу после воскрешения.
+	SpawnIFrames int
+
 	// Монеты, выпавшие из врагов.
 	Coins int
 
@@ -140,13 +143,46 @@ func (p *Player) SwingProgress() float64 {
 }
 
 func (p *Player) TakeDamage(n int) {
-	if p.DashActive || p.MeleeIFrames > 0 {
+	if p.DashActive || p.MeleeIFrames > 0 || p.SpawnIFrames > 0 {
 		return
 	}
 	if n <= 0 {
 		return
 	}
 	p.Damage += n
+}
+
+// Revive возвращает игрока в строй: полное HP и сброс всех эффектов.
+// Позицию выставляет вызывающий (обычно — зона спавна).
+func (p *Player) Revive() {
+	p.Damage = 0
+
+	p.BurnTimer = 0
+	p.BurnTick = 0
+
+	p.KnockbackVX = 0
+	p.KnockbackVY = 0
+	p.KnockbackTimer = 0
+
+	p.Held = false
+	p.HeldBy = -1
+
+	p.DashActive = false
+	p.DashActiveTimer = 0
+	p.DashChargeTicks = 0
+
+	p.MeleeIFrames = 0
+	p.ParryWindow = 0
+	p.ParryCooldown = 0
+	p.SpawnIFrames = ReviveIFrames
+
+	p.VulnArmed = false
+	p.VulnTimer = 0
+	p.RoFStacks = 0
+
+	p.Swing.Active = false
+	p.AimCharge = 0
+	p.FireCooldownTimer = 0
 }
 
 // Heal уменьшает «долг» урона, но не опускает его ниже нуля.
@@ -161,6 +197,10 @@ func (p *Player) Heal(n int) {
 }
 
 func (p *Player) IsDead() bool {
+	// Пока снаряжение не выбрано, MaxHP = 0 — это не смерть, а лобби-фаза.
+	if !p.HasWeapon() {
+		return false
+	}
 	return p.CurrentHP() <= 0
 }
 
@@ -258,7 +298,7 @@ func (p *Player) IsBurning() bool {
 }
 
 func (p *Player) IsInvulnerable() bool {
-	return p.DashActive || p.MeleeIFrames > 0
+	return p.DashActive || p.MeleeIFrames > 0 || p.SpawnIFrames > 0
 }
 
 // PierceCount — сколько врагов пробьёт следующий выстрел снайперки.

@@ -46,8 +46,6 @@ func StepEnemies(w *world.World) {
 		}
 	}
 
-	p := &w.Player
-
 	for i := range w.Enemies {
 		e := &w.Enemies[i]
 		if e.IsDead() {
@@ -87,6 +85,7 @@ func StepEnemies(w *world.World) {
 		}
 
 		ecx, ecy := e.Center()
+		p := w.NearestPlayer(ecx, ecy)
 		pcx, pcy := p.Center()
 		dx := pcx - ecx
 		dy := pcy - ecy

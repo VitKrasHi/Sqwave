@@ -19,6 +19,7 @@ const panelW = 380.0
 
 type Menu struct {
 	onStart func()
+	onCoop  func()
 	onExit  func()
 
 	buttons  []*Button
@@ -34,9 +35,10 @@ func (m *Menu) SetGlitchMode(g bool) {
 	m.glitch = g
 }
 
-func New(music *audio.Player, onStart, onExit func()) *Menu {
+func New(music *audio.Player, onStart, onCoop, onExit func()) *Menu {
 	m := &Menu{
 		onStart:  onStart,
+		onCoop:   onCoop,
 		onExit:   onExit,
 		music:    music,
 		settings: settings.New(music),
@@ -58,12 +60,13 @@ func (m *Menu) buildButtons() {
 	)
 	m.buttons = []*Button{
 		{Label: "Create game", X: btnX, Y: btnY, W: btnW, H: btnH, Action: m.onStart},
-		{Label: "Settings", X: btnX, Y: btnY + btnH + gap, W: btnW, H: btnH,
+		{Label: "Co-op (LAN)", X: btnX, Y: btnY + btnH + gap, W: btnW, H: btnH, Action: m.onCoop},
+		{Label: "Settings", X: btnX, Y: btnY + (btnH+gap)*2, W: btnW, H: btnH,
 			Action: func() {
 				m.settings.Open = true
 				m.settings.Selected = settings.SelVolume
 			}},
-		{Label: "Exit", X: btnX, Y: btnY + (btnH+gap)*2, W: btnW, H: btnH, Action: m.onExit},
+		{Label: "Exit", X: btnX, Y: btnY + (btnH+gap)*3, W: btnW, H: btnH, Action: m.onExit},
 	}
 }
 

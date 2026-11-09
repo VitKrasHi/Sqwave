@@ -32,6 +32,7 @@ func DrawStatsOverlay(r SceneRenderer, stats *world.Stats, startY float64) {
 		{"Enemies Killed", fmt.Sprintf("%d", stats.EnemiesKilled)},
 		{"Waves Survived", fmt.Sprintf("%d", stats.WavesSurvived)},
 		{"Coins Earned", fmt.Sprintf("%d", stats.CoinsEarned)},
+		{"Revives", fmt.Sprintf("%d", stats.Revives)},
 		{"Playtime", formatPlaytime(stats.PlaytimeTicks)},
 	}
 

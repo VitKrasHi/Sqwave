@@ -9,7 +9,11 @@ import (
 )
 
 type World struct {
-	Player             Player
+	// Players — все игроки мира. В одиночной игре один элемент.
+	Players []Player
+	// Local — индекс игрока локального пользователя (для HUD, меню, камеры).
+	Local int
+
 	Enemies            []Enemy
 	Bullets            []Bullet
 	Rockets            []Rocket
@@ -34,6 +38,8 @@ type World struct {
 
 	// Музыка: если непустое, Game переключит трек и обнулит.
 	PendingTrack string
+	// CurrentTrack — играющий сейчас трек (уходит в снапшот клиентам).
+	CurrentTrack string
 
 	Stats Stats
 }
@@ -97,7 +103,7 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 	}
 
 	w := &World{
-		Player: Player{
+		Players: []Player{{
 			X:         playerX,
 			Y:         playerY,
 			PrevX:     playerX,
@@ -105,7 +111,8 @@ func NewWithOptions(seed int64, kind MapKind, opts Options) *World {
 			Weapon:    WeaponNone,
 			Secondary: WeaponNone,
 			HeldBy:    -1,
-		},
+		}},
+		Local: 0,
 		Walls: wallsForMap(kind),
 		SpawnZone: geometry.Rect{
 			X: playerX - spawnSize/2 + PlayerSize/2,
@@ -146,9 +153,17 @@ func (w *World) AllocSummonerID() int {
 	return w.NextSummonerID
 }
 
-// PlayerInSpawnZone — центр игрока внутри прямоугольника зоны спавна.
+// PlayerInSpawnZone — центр локального игрока внутри зоны спавна.
 func (w *World) PlayerInSpawnZone() bool {
-	cx, cy := w.Player.Center()
+	return w.InSpawnZone(w.LocalPlayer())
+}
+
+// InSpawnZone — центр конкретного игрока внутри прямоугольника зоны спавна.
+func (w *World) InSpawnZone(p *Player) bool {
+	if p == nil {
+		return false
+	}
+	cx, cy := p.Center()
 	return cx >= w.SpawnZone.X && cx <= w.SpawnZone.X+w.SpawnZone.W &&
 		cy >= w.SpawnZone.Y && cy <= w.SpawnZone.Y+w.SpawnZone.H
 }
@@ -275,7 +290,7 @@ func defaultWalls() []geometry.Rect {
 // NearestSpawnDist — расстояние от игрока до ближайшего живого спавна.
 // -1 если живых спавнов нет.
 func (w *World) NearestSpawnDist() float64 {
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.LocalPlayer().Center()
 	best := -1.0
 	for i := range w.SpawnPoints {
 		if w.SpawnPoints[i].IsDead() {

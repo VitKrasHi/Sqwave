@@ -8,7 +8,7 @@ import (
 
 func stepFleer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	// --- Уже сцепился с игроком ---
 	if e.Latched {
@@ -18,7 +18,7 @@ func stepFleer(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 			p.HeldBy = -1
 			return
 		}
-		if TryMeleeDamage(w, e, stats.FleerLatchDmg) {
+		if TryMeleeDamage(w, p, e, stats.FleerLatchDmg) {
 			// Парировано — отпускаем.
 			e.Latched = false
 			p.Held = false

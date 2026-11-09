@@ -12,8 +12,8 @@ import (
 
 // StepShooting — диспетчер стрельбы: melee, снайперка с зарядкой,
 // автоматическое оружие (пистолет/автомат/дробовик/ракетница).
-func StepShooting(w *world.World, in input.PlayerInput) {
-	p := &w.Player
+func StepShooting(w *world.World, idx int, in input.PlayerInput) {
+	p := &w.Players[idx]
 	if !p.HasWeapon() {
 		return
 	}
@@ -22,12 +22,12 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	}
 
 	if p.Weapon.IsMelee() {
-		stepMelee(w, in)
+		stepMelee(w, p, in)
 		return
 	}
 
 	if p.Weapon == world.WeaponSniper {
-		stepPlayerSniper(w, in)
+		stepPlayerSniper(w, p, in)
 		return
 	}
 
@@ -50,9 +50,9 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 	for i := 0; i < weapon.Pellets; i++ {
 		angle := baseAngle + spreadOffset(w.Rng, weapon.Spread)
 		if weapon.ProjectileSpeed > 0 {
-			spawnRocket(w, cx, cy, angle, weapon)
+			spawnRocket(w, p, cx, cy, angle, weapon)
 		} else {
-			if fireRay(w, cx, cy, angle, 0) {
+			if fireRay(w, p, cx, cy, angle, 0) {
 				anyHit = true
 			}
 		}
@@ -67,8 +67,7 @@ func StepShooting(w *world.World, in input.PlayerInput) {
 }
 
 // stepPlayerSniper — зажал ЛКМ → копится заряд, отпустил → выстрел.
-func stepPlayerSniper(w *world.World, in input.PlayerInput) {
-	p := &w.Player
+func stepPlayerSniper(w *world.World, p *world.Player, in input.PlayerInput) {
 	weapon := p.Weapon.Stats()
 
 	switch {
@@ -97,9 +96,9 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 		}
 		var hit bool
 		if weapon.MaxPierce > 1 {
-			hit = fireSniperPierce(w, cx, cy, baseAngle, chargeRatio)
+			hit = fireSniperPierce(w, p, cx, cy, baseAngle, chargeRatio)
 		} else {
-			hit = fireRay(w, cx, cy, baseAngle, chargeRatio)
+			hit = fireRay(w, p, cx, cy, baseAngle, chargeRatio)
 		}
 
 		p.AimCharge = 0
@@ -113,8 +112,7 @@ func stepPlayerSniper(w *world.World, in input.PlayerInput) {
 
 // stepMelee — замах меча/щита. Урон наносится каждый тик через applyMeleeHit,
 // один и тот же враг получает удар не больше одного раза за замах (SwingID).
-func stepMelee(w *world.World, in input.PlayerInput) {
-	p := &w.Player
+func stepMelee(w *world.World, p *world.Player, in input.PlayerInput) {
 	weapon := p.Weapon.Stats()
 
 	if p.Swing.Active {
@@ -157,8 +155,8 @@ func stepMelee(w *world.World, in input.PlayerInput) {
 // fireRay пускает hitscan-луч. Ищет ближайшее попадание среди стен,
 // врагов, турелей, зацепленных гарпунов и вражеских спавнов.
 // Урон наносится в зависимости от того, во что попал.
-func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
-	weapon := w.Player.Weapon.Stats()
+func fireRay(w *world.World, p *world.Player, cx, cy, angle, chargeRatio float64) bool {
+	weapon := p.Weapon.Stats()
 	cos := math.Cos(angle)
 	sin := math.Sin(angle)
 
@@ -236,15 +234,15 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 	if hitEnemy != nil {
 		if !hitEnemy.Invulnerable && !BlocksDamageFrom(hitEnemy, startX, startY) {
 			distance := enemyT * weapon.Range
-			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
-			DealDamageToEnemy(w, hitEnemy, dmg)
+			dmg := p.Weapon.DamageAt(distance, chargeRatio)
+			DealDamageToEnemy(w, p, hitEnemy, dmg)
 		}
 	} else if hitTurret != nil {
 		// Турели неуязвимы до конца волны.
 	} else if hitSpawn != nil {
 		if !SpawnIsProtected(w, hitSpawn) {
 			distance := enemyT * weapon.Range
-			dmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			dmg := p.Weapon.DamageAt(distance, chargeRatio)
 			hitSpawn.Damage(dmg)
 		}
 		// Если защищён — луч упирается в щит, урона нет.
@@ -258,7 +256,7 @@ func fireRay(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 		EndY:    endY,
 		Life:    weapon.VisualLife,
 		MaxLife: weapon.VisualLife,
-		Weapon:  w.Player.Weapon,
+		Weapon:  p.Weapon,
 	})
 
 	return hitEnemy != nil || hitTurret != nil || hitSpawn != nil
@@ -327,7 +325,7 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 			}
 		} else {
 			dmg := p.Weapon.DamageAt(0, 1)
-			DealDamageToEnemy(w, e, dmg)
+			DealDamageToEnemy(w, p, e, dmg)
 
 			// Оглушение мечом — работает на всех врагов.
 			if weapon.StunOnHit > 0 {
@@ -377,7 +375,7 @@ func applyMeleeHit(w *world.World, p *world.Player, weapon world.WeaponStats) {
 }
 
 // spawnRocket создаёт движущийся снаряд ракетницы.
-func spawnRocket(w *world.World, cx, cy, angle float64, weapon world.WeaponStats) {
+func spawnRocket(w *world.World, p *world.Player, cx, cy, angle float64, weapon world.WeaponStats) {
 	life := int(weapon.Range / weapon.ProjectileSpeed)
 	if life <= 0 {
 		life = 60
@@ -390,7 +388,8 @@ func spawnRocket(w *world.World, cx, cy, angle float64, weapon world.WeaponStats
 		Size:            weapon.ProjectileSize,
 		Life:            life,
 		MaxLife:         life,
-		Weapon:          w.Player.Weapon,
+		Weapon:          p.Weapon,
+		Owner:           w.PlayerIndex(p),
 		ExplosionRadius: weapon.ExplosionRadius,
 		ExplosionLife:   weapon.ExplosionLife,
 	})
@@ -408,8 +407,8 @@ func spreadOffset(rng *rand.Rand, spreadDeg float64) float64 {
 // fireSniperPierce — выстрел снайперки, пробивающий несколько врагов.
 // Количество пробитых = 1 + AimChargeRatio * (MaxPierce - 1).
 // Каждый следующий враг получает меньше урона (-PierceDamageFalloff от базы).
-func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) bool {
-	weapon := w.Player.Weapon.Stats()
+func fireSniperPierce(w *world.World, p *world.Player, cx, cy, angle, chargeRatio float64) bool {
+	weapon := p.Weapon.Stats()
 	cos := math.Cos(angle)
 	sin := math.Sin(angle)
 
@@ -502,12 +501,12 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 
 		if !h.e.Invulnerable && !BlocksDamageFrom(h.e, startX, startY) {
 			distance := h.t * weapon.Range
-			baseDmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+			baseDmg := p.Weapon.DamageAt(distance, chargeRatio)
 			dmg := int(float64(baseDmg) * falloff)
 			if dmg < 1 {
 				dmg = 1
 			}
-			DealDamageToEnemy(w, h.e, dmg)
+			DealDamageToEnemy(w, p, h.e, dmg)
 		}
 
 		endT = h.t
@@ -517,7 +516,7 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 	// Если прошив не исчерпан и есть вражеский спавн — бьём его.
 	if pierced < pierceCount && hitSpawn != nil && !SpawnIsProtected(w, hitSpawn) {
 		distance := obstacleT * weapon.Range
-		baseDmg := w.Player.Weapon.DamageAt(distance, chargeRatio)
+		baseDmg := p.Weapon.DamageAt(distance, chargeRatio)
 		falloff := 1.0 - weapon.PierceDamageFalloff*float64(pierced)
 		if falloff < 0.15 {
 			falloff = 0.15
@@ -544,7 +543,7 @@ func fireSniperPierce(w *world.World, cx, cy, angle, chargeRatio float64) bool {
 		EndY:    endY,
 		Life:    weapon.VisualLife,
 		MaxLife: weapon.VisualLife,
-		Weapon:  w.Player.Weapon,
+		Weapon:  p.Weapon,
 	})
 
 	return len(hits) > 0 || hitSpawn != nil

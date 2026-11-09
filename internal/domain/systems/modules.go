@@ -6,7 +6,7 @@ import "Sqwave/internal/domain/world"
 //
 //	Blood Exchange: игрок лечится на 1/4 от нанесённого урона.
 //	Vulnerability: первый удар ставит метку, второй — x4 урона.
-func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
+func DealDamageToEnemy(w *world.World, p *world.Player, e *world.Enemy, dmg int) {
 	if dmg <= 0 {
 		return
 	}
@@ -17,8 +17,6 @@ func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
 	}
 
 	w.Stats.DamageDealt += dmg
-
-	p := &w.Player
 
 	switch p.ActiveModule {
 	case world.ModuleVulnerability:
@@ -42,8 +40,11 @@ func DealDamageToEnemy(w *world.World, e *world.Enemy, dmg int) {
 
 // StepModules — тикает таймеры активного модуля.
 // Vulnerability: если метка не была снята за 5 сек — штраф -25% текущего HP.
-func StepModules(w *world.World) {
-	p := &w.Player
+func StepModules(w *world.World, idx int) {
+	if idx < 0 || idx >= len(w.Players) {
+		return
+	}
+	p := &w.Players[idx]
 
 	// Тик анонса модуля.
 	if p.ModuleAnnounce > 0 {

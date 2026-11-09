@@ -6,6 +6,9 @@ import "Sqwave/internal/domain/geometry"
 // летит тик за тиком, пока не столкнётся со стеной, не выйдет
 // за пределы мира или не истечёт Life.
 type Rocket struct {
+	// Owner — индекс игрока, выпустившего ракету (для модулей и статистики).
+	Owner int
+
 	X, Y    float64
 	VX, VY  float64
 	Size    float64

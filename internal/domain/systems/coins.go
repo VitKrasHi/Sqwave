@@ -8,15 +8,20 @@ import (
 
 // StepCoins — обработка монет: притягивание к игроку, подбор, таймер жизни.
 func StepCoins(w *world.World) {
-	p := &w.Player
-	pcx, pcy := p.Center()
-
 	alive := w.Coins[:0]
 	for _, c := range w.Coins {
 		c.Life--
 		if c.Life <= 0 {
 			continue
 		}
+
+		// Монету тянет ближайший живой игрок.
+		p := w.NearestPlayer(c.X, c.Y)
+		if p == nil || p.IsDead() {
+			alive = append(alive, c)
+			continue
+		}
+		pcx, pcy := p.Center()
 
 		dx := pcx - c.X
 		dy := pcy - c.Y

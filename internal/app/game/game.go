@@ -6,6 +6,8 @@ import (
 	"math"
 	"os"
 
+	netpkg "Sqwave/internal/net"
+
 	"Sqwave/internal/app/settings"
 	"Sqwave/internal/domain/geometry"
 	"Sqwave/internal/domain/input"
@@ -45,6 +47,17 @@ type Game struct {
 
 	pauseBtnHovered bool
 	hudBtnHovered   bool
+
+	// Сеть (см. network.go).
+	netMode          netMode
+	netHost          *netpkg.Host
+	netClient        *netpkg.Client
+	lastSnapshotTick uint32
+	lastTrack        string
+	netIDs           []uint8
+	remoteInputs     map[uint8]netpkg.WireInput
+	connectionLost   bool
+	onDisconnected   func()
 }
 
 func (g *Game) SetOnPlayerDied(f func()) {
@@ -64,11 +77,11 @@ func New(w *world.World, in InputSource, music *audio.Player) *Game {
 		settings: settings.New(music),
 		music:    music,
 	}
-	cx, cy := w.Player.Center()
+	cx, cy := w.LocalPlayer().Center()
 	g.camera.Follow(cx, cy, cx, cy, 0)
-	if !w.Player.HasWeapon() {
+	if !w.LocalPlayer().HasWeapon() {
 		g.menu.Open = true
-		g.menu.Reset(&w.Player)
+		g.menu.Reset(w.LocalPlayer())
 	}
 	return g
 }
@@ -87,6 +100,28 @@ func (g *Game) Stats() *world.Stats {
 }
 
 func (g *Game) Update() error {
+	if g.netMode == netGuest {
+		g.pollGuestEvents()
+		// Пауза/настройки на клиенте: мир живёт, поэтому персонаж должен
+		// стоять, а не бежать по последнему вводу.
+		if g.paused || g.settings.Open {
+			g.sendGuestInput(input.PlayerInput{})
+		}
+	}
+	if g.netMode == netHost {
+		g.pollHostEvents()
+		// Команды клиентов (снаряжение, лечение) применяем всегда: хост может
+		// быть в своём меню или на паузе, а гость в это время выбирает оружие.
+		g.applyRemoteCommands()
+	}
+	err := g.update()
+	if g.netMode == netHost {
+		g.broadcastSnapshot()
+	}
+	return err
+}
+
+func (g *Game) update() error {
 	if g.ticks == 0 {
 		wd, _ := os.Getwd()
 		println("CWD:", wd)
@@ -180,6 +215,11 @@ func (g *Game) Update() error {
 	in.AimY = (in.AimY-float64(world.ScreenHeight)/2)/g.camera.Zoom + g.camera.Y
 	g.lastInput = in
 
+	if g.netMode == netGuest {
+		g.guestFrame(in)
+		return nil
+	}
+
 	// Кнопки паузы и HUD (мышь).
 	mx, my := ebiten.CursorPosition()
 	fx, fy := float64(mx), float64(my)
@@ -204,31 +244,49 @@ func (g *Game) Update() error {
 	}
 
 	// Открыть меню.
-	if in.Interact && !g.menu.Open && g.world.PlayerInSpawnZone() {
+	if in.Interact && !g.menu.Open && !g.world.LocalPlayer().IsDead() && g.world.PlayerInSpawnZone() {
 		g.menu.Open = true
-		g.menu.Reset(&g.world.Player)
-		cx, cy := g.world.Player.Center()
+		g.menu.Reset(g.world.LocalPlayer())
+		cx, cy := g.world.LocalPlayer().Center()
 		g.camera.Follow(cx, cy, cx, cy, 0)
 		return nil
 	}
 
 	if g.menu.Open {
-		if handleMenuInput(g.world, &g.menu, in) {
+		// Умер, пока меню было открыто — закрываем: мёртвый ничего не покупает.
+		if g.world.LocalPlayer().IsDead() {
+			g.menu.Open = false
+		} else if handleMenuInput(g.world, &g.menu, in) {
 			g.menu.Open = false
 		}
-		cx, cy := g.world.Player.Center()
+		cx, cy := g.world.LocalPlayer().Center()
 		g.camera.Follow(cx, cy, cx, cy, 0)
-		return nil
+		// В одиночной игре меню ставит мир на паузу (как раньше).
+		// В кооперативе мир общий: пауза у одного останавливала бы всех,
+		// поэтому просто гасим управление — персонаж стоит, мир живёт.
+		if g.netMode == netOff {
+			return nil
+		}
+		in.Up, in.Down, in.Left, in.Right = false, false, false, false
+		in.Fire, in.FireReleased = false, false
+		in.Dash, in.DashChargeHeld = false, false
+		in.SwapWeapon, in.Interact = false, false
 	}
 
-	systems.StepPlayer(g.world, in)
-	systems.StepModules(g.world)
-	systems.StepWeaponSelection(g.world, in)
-	systems.StepShooting(g.world, in)
+	g.world.Stats.PlaytimeTicks++
+	systems.StepPlayer(g.world, g.world.Local, in)
+	systems.StepModules(g.world, g.world.Local)
+	systems.StepWeaponSelection(g.world, g.world.Local, in)
+	systems.StepShooting(g.world, g.world.Local, in)
+	g.stepRemotePlayers()
 	systems.StepBullets(g.world)
 	systems.StepRockets(g.world)
 	systems.StepExplosions(g.world)
-	systems.StepWaves(g.world)
+	// Кооп: ждём, пока все выберут снаряжение — иначе волна начнётся,
+	// пока напарник ещё в меню спавна.
+	if g.netMode == netOff || g.world.AllPlayersArmed() {
+		systems.StepWaves(g.world)
+	}
 	// R — досрочно начать волну (только во время паузы, при закрытом меню).
 	if !g.menu.Open && inpututil.IsKeyJustPressed(ebiten.KeyR) && !g.world.Wave.Active {
 		g.world.StartWaveRequested = true
@@ -240,6 +298,7 @@ func (g *Game) Update() error {
 				println("AUDIO ERROR:", err.Error())
 			}
 		}
+		g.world.CurrentTrack = g.world.PendingTrack
 		g.world.PendingTrack = ""
 	}
 
@@ -251,29 +310,36 @@ func (g *Game) Update() error {
 	systems.StepBurning(g.world)
 	systems.StepCoins(g.world)
 
-	cx, cy := g.world.Player.Center()
-	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.Player.AimChargeRatio())
+	cp := g.cameraPlayer()
+	cx, cy := cp.Center()
+	g.camera.Follow(cx, cy, in.AimX, in.AimY, g.world.LocalPlayer().AimChargeRatio())
 
-	if !g.deathFired && g.world.Player.IsDead() {
+	// Кооп: конец игры, когда мертвы все.
+	if !g.deathFired && g.world.AllPlayersDead() {
 		g.deathFired = true
+		g.notifyGameOver(false)
 		if g.onPlayerDied != nil {
 			g.onPlayerDied()
 		}
 	}
 
 	// Победа — все волны пройдены.
-	if !g.victoryFired && g.world.Wave.IsVictory() && !g.world.Player.IsDead() {
+	if !g.victoryFired && g.world.Wave.IsVictory() && !g.world.AllPlayersDead() {
 		g.victoryFired = true
+		g.notifyGameOver(true)
 		if g.onVictory != nil {
 			g.onVictory()
 		}
 	}
 
 	// Defend: если все спавны уничтожены — игрок проигрывает.
-	if g.world.Wave.Kind == world.WaveKindDefend &&
-		g.world.Wave.DefendOutcome == -1 &&
-		!g.world.Player.IsDead() {
-		g.world.Player.TakeDamage(999999)
+	if g.world.Wave.Kind == world.WaveKindDefend && g.world.Wave.DefendOutcome == -1 {
+		for i := range g.world.Players {
+			p := &g.world.Players[i]
+			if !p.IsDead() {
+				p.Damage = p.MaxHP()
+			}
+		}
 	}
 
 	return nil
@@ -361,21 +427,34 @@ func (g *Game) Draw(r SceneRenderer) {
 	drawTurrets(r, w)
 	drawEnemies(r, w)
 
-	p := &w.Player
-	playerColor := ColorPlayer
-	if p.Dashing() {
-		playerColor = ColorPlayerDash
+	// Тела всех игроков: свой — обычный цвет, напарники — приглушённый.
+	for i := range w.Players {
+		op := &w.Players[i]
+		c := ColorPlayerRemote
+		if i == w.Local {
+			c = ColorPlayer
+		}
+		if op.Dashing() {
+			c = ColorPlayerDash
+		}
+		if op.IsDead() {
+			c = ColorPlayerDead
+		}
+		r.DrawRect(op.X, op.Y, world.PlayerSize, world.PlayerSize, c)
 	}
-	r.DrawRect(p.X, p.Y, world.PlayerSize, world.PlayerSize, playerColor)
+
+	p := w.LocalPlayer()
 
 	pcx, pcy := p.Center()
-	dx := g.lastInput.AimX - pcx
-	dy := g.lastInput.AimY - pcy
-	if l := math.Hypot(dx, dy); l > 0 {
-		dx /= l
-		dy /= l
+	if !p.IsDead() {
+		dx := g.lastInput.AimX - pcx
+		dy := g.lastInput.AimY - pcy
+		if l := math.Hypot(dx, dy); l > 0 {
+			dx /= l
+			dy /= l
+		}
+		r.DrawLine(pcx, pcy, pcx+dx*aimLineLength, pcy+dy*aimLineLength, 2, ColorAim)
 	}
-	r.DrawLine(pcx, pcy, pcx+dx*aimLineLength, pcy+dy*aimLineLength, 2, ColorAim)
 
 	// Индикатор зарядки рывка.
 	if p.Weapon.IsShield() && p.DashChargeTicks > 0 {
@@ -441,26 +520,38 @@ func (g *Game) Draw(r SceneRenderer) {
 		}
 	}
 
+	// Кооп: локальный игрок мёртв, но напарники живы — режим наблюдателя.
+	if len(w.Players) > 1 && w.LocalPlayer().IsDead() && !g.deathFired {
+		r.DrawScreenTextScaled("SPECTATING", float64(world.ScreenWidth)/2-90, 90, 2.0,
+			color.NRGBA{R: 200, G: 200, B: 220, A: 255})
+		r.DrawScreenText("You are dead. Teammates can revive you:",
+			float64(world.ScreenWidth)/2-170, 128,
+			color.NRGBA{R: 150, G: 160, B: 180, A: 255})
+		r.DrawScreenText("survive to the end of the wave, or buy a revive in the spawn menu.",
+			float64(world.ScreenWidth)/2-250, 148,
+			color.NRGBA{R: 150, G: 160, B: 180, A: 255})
+	}
+
 	// Критические статусы игрока — всегда видны, даже с выключенным HUD.
-	if w.Player.Held {
+	if w.LocalPlayer().Held {
 		r.DrawScreenTextScaled("!! CAUGHT !!", 8, float64(world.ScreenHeight)-90, 2.0,
 			color.NRGBA{R: 255, G: 60, B: 80, A: 255})
 	}
-	if w.Player.IsBurning() {
+	if w.LocalPlayer().IsBurning() {
 		r.DrawScreenTextScaled("BURNING", 8, 80, 1.4,
 			color.NRGBA{R: 255, G: 120, B: 40, A: 255})
 	}
 
-	if w.Player.ActiveModule != world.ModuleNone {
+	if w.LocalPlayer().ActiveModule != world.ModuleNone {
 		r.DrawScreenTextScaled(
-			fmt.Sprintf("MODULE: %s", w.Player.ActiveModule.Stats().Name),
+			fmt.Sprintf("MODULE: %s", w.LocalPlayer().ActiveModule.Stats().Name),
 			8, 110, 1.2,
 			color.NRGBA{R: 255, G: 100, B: 180, A: 255})
 
 		// Vulnerability: индикатор активной метки.
-		if w.Player.ActiveModule == world.ModuleVulnerability && w.Player.VulnArmed {
-			ratio := float64(w.Player.VulnTimer) / float64(world.VulnMarkTicks)
-			sec := float64(w.Player.VulnTimer) / 60.0
+		if w.LocalPlayer().ActiveModule == world.ModuleVulnerability && w.LocalPlayer().VulnArmed {
+			ratio := float64(w.LocalPlayer().VulnTimer) / float64(world.VulnMarkTicks)
+			sec := float64(w.LocalPlayer().VulnTimer) / 60.0
 
 			// Цвет от зелёного к красному по мере истечения.
 			rr := uint8(255 * (1 - ratio))
@@ -472,8 +563,8 @@ func (g *Game) Draw(r SceneRenderer) {
 				8, 130, 1.2, c)
 		}
 		// Rate of Fire: индикатор стаков.
-		if w.Player.ActiveModule == world.ModuleRateOfFire {
-			stacks := w.Player.RoFStacks
+		if w.LocalPlayer().ActiveModule == world.ModuleRateOfFire {
+			stacks := w.LocalPlayer().RoFStacks
 			c := color.NRGBA{R: 255, G: 140, B: 40, A: 255}
 			text := fmt.Sprintf("RoF: %d/%d", stacks, world.RoFMaxStacks)
 			if stacks == 0 {
@@ -484,11 +575,11 @@ func (g *Game) Draw(r SceneRenderer) {
 	}
 
 	// Анонс полученного модуля.
-	if w.Player.ModuleAnnounce > 0 {
-		pulse := uint8(180 + 75*math.Sin(float64(w.Player.ModuleAnnounce)*0.2))
+	if w.LocalPlayer().ModuleAnnounce > 0 {
+		pulse := uint8(180 + 75*math.Sin(float64(w.LocalPlayer().ModuleAnnounce)*0.2))
 		r.DrawScreenTextScaled(
 			fmt.Sprintf("NEW MODULE: %s",
-				w.Player.ActiveModule.Stats().Name),
+				w.LocalPlayer().ActiveModule.Stats().Name),
 			float64(world.ScreenWidth)/2-140, 40, 1.8,
 			color.NRGBA{R: 255, G: 220, B: 100, A: pulse})
 	}
@@ -497,7 +588,7 @@ func (g *Game) Draw(r SceneRenderer) {
 	if g.hudVisible {
 		// Подсказки.
 		r.DrawText("Sqwave — WASD move, Space dash, LMB fire, Q swap, E menu, F11 fullscreen, Tab HUD", 8, 8)
-		r.DrawText(formatLoadout(&w.Player), 8, 24)
+		r.DrawText(formatLoadout(w.LocalPlayer()), 8, 24)
 		if p.IsAiming() {
 			r.DrawText(fmt.Sprintf("Charge: %d%%", int(p.AimChargeRatio()*100)), 8, 40)
 			pierce := p.PierceCount()
@@ -511,6 +602,7 @@ func (g *Game) Draw(r SceneRenderer) {
 
 		drawHPBar(r, p.CurrentHP(), p.MaxHP())
 		drawCoinCounter(r, p)
+		drawPartyHUD(r, w)
 		drawWavePanel(r, w)
 
 		// Индикатор установки турели.
@@ -535,7 +627,7 @@ func (g *Game) Draw(r SceneRenderer) {
 
 	// Меню всегда поверх HUD.
 	if g.menu.Open {
-		drawMenu(r, &g.menu, p)
+		drawMenu(r, w, &g.menu, p)
 	}
 
 	if p.IsBurning() {
@@ -784,7 +876,7 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 
 		if e.Type == world.EnemyFleer && e.Latched {
 			cx, cy := e.Center()
-			pcx, pcy := w.Player.Center()
+			pcx, pcy := w.LocalPlayer().Center()
 			ang := math.Atan2(pcy-cy, pcx-cx)
 			bx := cx + math.Cos(ang)*18
 			by := cy + math.Sin(ang)*18
@@ -878,7 +970,7 @@ func drawEnemies(r SceneRenderer, w *world.World) {
 
 		if e.Type == world.EnemyGhost && e.AttackTimer > 40 {
 			cx, cy := e.Center()
-			pcx, pcy := w.Player.Center()
+			pcx, pcy := w.LocalPlayer().Center()
 			ang := math.Atan2(pcy-cy, pcx-cx)
 			r.DrawLine(cx, cy,
 				cx+math.Cos(ang)*14,
@@ -1167,7 +1259,7 @@ func drawFleerCones(r SceneRenderer, w *world.World) {
 }
 
 func drawTurrets(r SceneRenderer, w *world.World) {
-	p := &w.Player
+	p := w.LocalPlayer()
 	pcx, pcy := p.Center()
 
 	for i := range w.Turrets {

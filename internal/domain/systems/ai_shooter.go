@@ -22,7 +22,8 @@ func stepShooter(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float6
 		return
 	}
 
-	losX, losY, los := losToRectWithPad(w, ecx, ecy, w.Player.Rect(),
+	tgt := w.NearestPlayer(e.X, e.Y)
+	losX, losY, los := losToRectWithPad(w, ecx, ecy, tgt.Rect(),
 		stats.ProjectileSize/2+1)
 
 	// Стреляем только когда видим игрока.
@@ -136,10 +137,11 @@ func clamp(v, lo, hi float64) float64 {
 // shootPosition — поиск точки с LOS на игрока в комфортной зоне.
 // Используется, когда стрелок потерял видимость.
 func shootPosition(w *world.World, e *world.Enemy, pcx, pcy float64) (float64, float64, bool) {
+	tgt := w.NearestPlayer(e.X, e.Y)
 	if e.ShootPosTimer > 0 {
 		e.ShootPosTimer--
 		if _, _, ok := losToRectWithPad(w, e.ShootPosX, e.ShootPosY,
-			w.Player.Rect(), e.Type.Stats().ProjectileSize/2+1); ok {
+			tgt.Rect(), e.Type.Stats().ProjectileSize/2+1); ok {
 			return e.ShootPosX, e.ShootPosY, true
 		}
 		e.ShootPosTimer = 0
@@ -177,7 +179,7 @@ func shootPosition(w *world.World, e *world.Enemy, pcx, pcy float64) (float64, f
 			if math.Hypot(wx-ecx, wy-ecy) < 40 {
 				continue
 			}
-			if _, _, ok := losToRectWithPad(w, wx, wy, w.Player.Rect(),
+			if _, _, ok := losToRectWithPad(w, wx, wy, tgt.Rect(),
 				stats.ProjectileSize/2+1); !ok {
 				continue
 			}

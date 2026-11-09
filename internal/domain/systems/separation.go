@@ -21,7 +21,7 @@ func applySeparation(w *world.World) {
 		return
 	}
 
-	pcx, pcy := w.Player.Center()
+	pcx, pcy := w.PlayersCenter()
 
 	type push struct {
 		idx    int

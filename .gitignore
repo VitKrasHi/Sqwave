@@ -5,3 +5,8 @@ build
 platform
 app/card
 app/logo
+.gocache
+.tmp_*
+Sqwave-debug.exe
+sqwave.log
+.wineprefix

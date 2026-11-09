@@ -314,8 +314,8 @@ func gridWithAgents(base *geometry.Grid, enemies []world.Enemy, skip *world.Enem
 // удар. Попадание проверяется как отрезок МЕЧА против хитбокса игрока,
 // плюс страховочная проверка конуса в конце.
 func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) bool {
-	pcx, pcy := w.Player.Center()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
+	pcx, pcy := p.Center()
 
 	const lungeDur = 12
 	const lungeOvershoot = 60.0
@@ -362,7 +362,7 @@ func processMeleeAttack(w *world.World, e *world.Enemy, stats world.EnemyStats) 
 
 	dealDamage := func() {
 		dmg := int(float64(stats.Damage) * e.DamageMul())
-		TryMeleeDamage(w, e, dmg)
+		TryMeleeDamage(w, p, e, dmg)
 		e.LungeHit = true
 	}
 

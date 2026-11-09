@@ -31,7 +31,7 @@ func isPriorityWeakType(t world.EnemyType) bool {
 
 func stepProtector(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	e.ProtectTargets = e.ProtectTargets[:0]
 

@@ -87,8 +87,9 @@ func updateSniperAim(w *world.World, e *world.Enemy, pcx, pcy float64) {
 	// Сколько времени игрок продолжит идти в текущем направлении —
 	// предсказываем на remaining тиков (не на весь aim duration,
 	// потому что прицел всё равно «подтягивается» каждый тик).
-	targetX := pcx + w.Player.VelX*remaining*e.SniperLeadFactor
-	targetY := pcy + w.Player.VelY*remaining*e.SniperLeadFactor
+	tgt := w.NearestPlayer(e.X, e.Y)
+	targetX := pcx + tgt.VelX*remaining*e.SniperLeadFactor
+	targetY := pcy + tgt.VelY*remaining*e.SniperLeadFactor
 
 	// Lerp. 0.18 — луч быстро наводится за 10–15 тиков.
 	const lerp = 0.18
@@ -139,7 +140,7 @@ func fireSniperShot(w *world.World, e *world.Enemy) {
 	e.SniperLeadFactor = 0
 
 	// Попадание в игрока — только если луч реально пересекает его хитбокс.
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 	pRect := p.Rect()
 	if _, ok := geometry.RaySegmentIntersectsRect(ecx, ecy, ex, ey, pRect); ok {
 		dmg := stats.SniperDamageMin +

@@ -152,7 +152,7 @@ func stepScout(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 //  1. Игрок резко двинул прицелом — срочное уклонение (urgency=true).
 //  2. Прицел точно наведён на скаута — одиночный рывок (queued=true).
 func detectAimThreat(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy float64) (bool, bool) {
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	aimDX := p.AimX - pcx
 	aimDY := p.AimY - pcy

@@ -94,6 +94,15 @@ func menuFullHPBuyRect() (x, y, w, h float64) {
 	return px + 20, statusY - 4, panelW - 40, 26
 }
 
+// menuReviveRect — блок воскрешения напарников (ниже блока лечения).
+func menuReviveRect() (x, y, w, h float64) {
+	px, py, panelW, _ := menuPanelOrigin()
+	contentY := py + 96
+	statusY := contentY + 110 + 70
+	revY := statusY + 52
+	return px + 20, revY - 22, panelW - 40, 96
+}
+
 // ---------- Ввод ----------
 
 func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
@@ -127,10 +136,19 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 			}
 		}
 	case TabFullHP:
-		if clicked {
-			bx, by, bw, bh := menuFullHPBuyRect()
-			if fx >= bx && fx <= bx+bw && fy >= by && fy <= by+bh {
+		bx, by, bw, bh := menuFullHPBuyRect()
+		if fx >= bx && fx <= bx+bw && fy >= by && fy <= by+bh {
+			m.Selection = 0
+			if clicked {
 				buyFullHP(w)
+				return false
+			}
+		}
+		rx, ry, rw, rh := menuReviveRect()
+		if fx >= rx && fx <= rx+rw && fy >= ry && fy <= ry+rh {
+			m.Selection = 1
+			if clicked {
+				buyRevive(w)
 				return false
 			}
 		}
@@ -169,8 +187,15 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 		}
 
 	case TabFullHP:
+		if in.MenuUp || in.MenuDown {
+			m.Selection = 1 - m.Selection
+		}
 		if in.MenuConfirm {
-			buyFullHP(w)
+			if m.Selection == 1 {
+				buyRevive(w)
+			} else {
+				buyFullHP(w)
+			}
 		}
 	}
 
@@ -178,7 +203,7 @@ func handleMenuInput(w *world.World, m *Menu, in input.PlayerInput) bool {
 }
 
 func confirmWeaponSelect(w *world.World, m *Menu) bool {
-	p := &w.Player
+	p := w.LocalPlayer()
 	picked := menuWeapons[m.Selection]
 	if weaponTakenByOtherSlot(p, picked) {
 		return false
@@ -194,8 +219,31 @@ func confirmWeaponSelect(w *world.World, m *Menu) bool {
 	return p.Weapon != world.WeaponNone && p.Secondary != world.WeaponNone
 }
 
+// buyRevive поднимает всех павших напарников: по 25 монет за каждого.
+// Возвращает true, если покупка прошла.
+func buyRevive(w *world.World) bool {
+	p := w.LocalPlayer()
+	if p == nil || p.IsDead() {
+		return false
+	}
+	dead := w.DeadCount()
+	if dead == 0 {
+		return false
+	}
+	cost := world.RevivePricePerPlayer * dead
+	if p.Coins < cost {
+		return false
+	}
+	p.Coins -= cost
+	w.ReviveDead()
+	return true
+}
+
 func buyFullHP(w *world.World) {
-	p := &w.Player
+	p := w.LocalPlayer()
+	if p == nil || p.IsDead() {
+		return
+	}
 	if p.ActiveModule == world.ModuleBloodExchange {
 		return
 	}
@@ -211,7 +259,7 @@ func buyFullHP(w *world.World) {
 
 // ---------- Отрисовка ----------
 
-func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
+func drawMenu(r SceneRenderer, w *world.World, m *Menu, p *world.Player) {
 	sw := float64(world.ScreenWidth)
 	sh := float64(world.ScreenHeight)
 
@@ -258,7 +306,7 @@ func drawMenu(r SceneRenderer, m *Menu, p *world.Player) {
 	case TabWeapons:
 		drawWeaponsTab(r, m, p, px, panelW, contentY)
 	case TabFullHP:
-		drawFullHPTab(r, p, px, panelW, contentY)
+		drawFullHPTab(r, w, m, p, px, panelW, contentY)
 	}
 
 	r.DrawScreenText(fmt.Sprintf("Coins: %d", p.Coins),
@@ -299,7 +347,7 @@ func drawWeaponsTab(r SceneRenderer, m *Menu, p *world.Player, px, panelW, topY 
 	}
 }
 
-func drawFullHPTab(r SceneRenderer, p *world.Player, px, panelW, topY float64) {
+func drawFullHPTab(r SceneRenderer, w *world.World, m *Menu, p *world.Player, px, panelW, topY float64) {
 	curHP := p.CurrentHP()
 	maxHP := p.MaxHP()
 	ratio := 0.0
@@ -343,8 +391,41 @@ func drawFullHPTab(r SceneRenderer, p *world.Player, px, panelW, topY float64) {
 		r.DrawScreenText(fmt.Sprintf("Need %d more coins", need),
 			px+20, statusY, ColorHPLow)
 	default:
-		r.DrawScreenText("[Enter] Buy Full Heal",
-			px+20, statusY, ColorMenuSelected)
+		if m.Selection == 0 {
+			r.DrawScreenText("> [Enter] Buy Full Heal",
+				px+20, statusY, ColorMenuSelected)
+		} else {
+			r.DrawScreenText("[Enter] Buy Full Heal",
+				px+20, statusY, ColorMenuDim)
+		}
+	}
+
+	// --- Воскрешение напарников ---
+	revY := statusY + 52
+	dead := w.DeadCount()
+	cost := world.RevivePricePerPlayer * dead
+
+	r.DrawScreenText("Revive teammates", px+20, revY, ColorMenuSelected)
+	if dead > 0 {
+		r.DrawScreenText(fmt.Sprintf("Dead: %d   Price: %d coins (%d each)",
+			dead, cost, world.RevivePricePerPlayer), px+20, revY+22, ColorMenuText)
+	} else {
+		r.DrawScreenText("Nobody is dead", px+20, revY+22, ColorMenuDim)
+	}
+
+	revStatusY := revY + 46
+	switch {
+	case dead == 0:
+		r.DrawScreenText("No one to revive", px+20, revStatusY, ColorMenuDim)
+	case p.Coins < cost:
+		r.DrawScreenText(fmt.Sprintf("Need %d more coins", cost-p.Coins),
+			px+20, revStatusY, ColorHPLow)
+	case m.Selection == 1:
+		r.DrawScreenText("> [Enter] Revive teammates",
+			px+20, revStatusY, ColorMenuSelected)
+	default:
+		r.DrawScreenText("[Enter] Revive teammates",
+			px+20, revStatusY, ColorMenuDim)
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 
 func stepGhost(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64) {
 	stats := e.Type.Stats()
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 
 	// Атака щитом в упор.
 	if e.AttackTimer > 0 {
@@ -17,7 +17,7 @@ func stepGhost(w *world.World, e *world.Enemy, ecx, ecy, pcx, pcy, dist float64)
 
 	if dist <= stats.GhostContactRange && e.AttackTimer == 0 && !p.IsDead() {
 		dmg := int(float64(stats.GhostContactDamage) * e.DamageMul())
-		TryMeleeDamage(w, e, dmg)
+		TryMeleeDamage(w, p, e, dmg)
 		e.AttackTimer = stats.GhostContactCool
 	}
 

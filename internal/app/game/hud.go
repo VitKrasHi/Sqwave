@@ -309,3 +309,56 @@ func drawCoinCounter(r SceneRenderer, p *world.Player) {
 	c := color.NRGBA{R: 255, G: 210, B: 60, A: 255}
 	r.DrawScreenText(fmt.Sprintf("Coins: %d", p.Coins), x, y, c)
 }
+
+// drawPartyHUD — полоски здоровья напарников в кооперативе.
+func drawPartyHUD(r SceneRenderer, w *world.World) {
+	if len(w.Players) < 2 {
+		return
+	}
+	const (
+		barW = 180.0
+		barH = 14.0
+	)
+	x := float64(world.ScreenWidth) - barW - 16
+	y := 96.0
+
+	for i := range w.Players {
+		if i == w.Local {
+			continue
+		}
+		p := &w.Players[i]
+		c := color.NRGBA{R: 120, G: 200, B: 255, A: 255}
+		if p.IsDead() {
+			c = color.NRGBA{R: 90, G: 90, B: 100, A: 255}
+		}
+
+		ratio := p.HPRatio()
+		if ratio < 0 {
+			ratio = 0
+		}
+
+		r.DrawScreenRect(x-1, y-1, barW+2, barH+2, ColorEnemyHPBack)
+		fill := barW * ratio
+		fillColor := ColorHPFull
+		if ratio < 0.5 {
+			fillColor = ColorHPMid
+		}
+		if ratio < 0.25 {
+			fillColor = color.NRGBA{R: 220, G: 60, B: 60, A: 255}
+		}
+		if p.IsDead() {
+			fillColor = c
+		}
+		r.DrawScreenRect(x, y, fill, barH, fillColor)
+
+		label := fmt.Sprintf("P%d", i+1)
+		if p.IsDead() {
+			label += " (dead)"
+		} else {
+			label += fmt.Sprintf(" %d/%d", p.CurrentHP(), p.MaxHP())
+		}
+		r.DrawScreenText(label, x+4, y-16, c)
+
+		y += barH + 22
+	}
+}

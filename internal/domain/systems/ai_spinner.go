@@ -66,7 +66,7 @@ func applySpinHit(w *world.World, e *world.Enemy, stats world.EnemyStats) {
 		return
 	}
 
-	p := &w.Player
+	p := w.NearestPlayer(e.X, e.Y)
 	if p.IsDead() {
 		return
 	}
@@ -81,7 +81,7 @@ func applySpinHit(w *world.World, e *world.Enemy, stats world.EnemyStats) {
 	invuln := p.DashActive
 
 	dmg := int(float64(stats.Damage) * e.DamageMul())
-	TryMeleeDamage(w, e, dmg)
+	TryMeleeDamage(w, p, e, dmg)
 
 	// Отбрасывание — только если игрок не в рывке.
 	if !invuln && d > 0.01 {
